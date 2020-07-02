@@ -91,10 +91,6 @@ def Translate(x, y, h, k):
 
 
 def Rotate(x, y, phi):
-    """
-
-    :rtype: object
-    """
     #   Rotates the vector (x, y) counter-clockwise arount the origin
 
     sinphi = np.sin(phi)
@@ -120,22 +116,6 @@ def Coeff(A, B, h, k, phi):
     FF = ((cosphi * h + sinphi * k) / A) ** 2 + ((sinphi * h - cosphi * k) / B) ** 2 - 1
 
     return AA, BB, CC, DD, EE, FF
-
-
-def FindNeighbors(i, d, x):
-    h = x[2, i]
-    k = x[3, i]
-
-    r = np.array([])
-
-    for j in range(np.size(x, axis=2)):
-        r = np.hstack((r, np.array([np.sqrt((x[2, j] - h) ** 2 + (x[3, j] - k) ** 2)])))
-
-    S = np.where(r <= d)
-    S = S[0]
-    S = [S[i] for i in range(np.size(S))]
-
-    return S
 
 
 def SolveX(y, V):
@@ -329,36 +309,6 @@ def twoPTarea(a, b, X, Y):
     OverallArea = (a[0] * a[1] * (theta[1] - theta[0]) + trsign * abs(xint[0] * yint[1] - xint[1] * yint[0])) / 2
 
     return OverallArea
-
-
-def cirArea(R, r, d):
-    return r ** 2 * np.arccos((d ** 2 + r ** 2 - R ** 2) / (2 * d * r)) + R ** 2 * np.arccos(
-        (d ** 2 + R ** 2 - r ** 2) / (2 * d * R)) - np.sqrt((-d + r + R) * (d + r - R) * (d - r + R) * (d + r + R)) / 2
-
-
-def Testing2area(N, max, min):
-    x = np.array([[], [], []])
-    for i in range(N):
-        x = np.hstack(
-            (x, [[(max - min) * np.random.rand() + min], [2 * max * np.random.rand()], [2 * max * np.random.rand()]]))
-
-    circles = np.zeros((N, N))
-    ellipses = np.zeros((N, N))
-
-    test = np.zeros((N, N))
-
-    for i in range(N):
-        for j in range(N):
-            circles[i, j] = cirArea(x[0, i], x[0, j], np.sqrt((x[1, i] - x[1, j]) ** 2 + (x[2, i] - x[2, j]) ** 2))
-
-            X, Y = InterPoints([x[0, i], x[0, i], x[1, i], x[2, i], 0], [x[0, j], x[0, j], x[1, j], x[2, j], 0])
-            ellipses[i, j] = twoPTarea([x[0, i], x[0, i], x[1, i], x[2, i], 0], [x[0, j], x[0, j], x[1, j], x[2, j], 0],
-                                       X, Y)
-
-            test[i, j] = ellipses[i, j] / circles[i, j]
-
-    return np.average(test)
-
 
 def fourPTarea(a, b, x, y):
     # returns the overlap area with 4 intersection points (Xint, Yint)
@@ -579,15 +529,3 @@ def Intersections(x, A, B, L):
                     continue
 
     return S
-
-
-def TestIntersections(S):
-    for i in range(np.size(S)):
-        for j in S[i]:
-            if i in S[j]:
-                continue
-            else:
-                print('Error')
-                return i, j
-
-    return 'Success!'
