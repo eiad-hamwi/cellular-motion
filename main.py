@@ -3,7 +3,7 @@ from numpy import random
 from matplotlib.patches import Ellipse
 import matplotlib.pyplot as plt
 
-from fresh_attempt import InterPoints, Intersections, twoPTarea, fourPTarea, GenerateCells, PlotCells, Rotate
+from fresh_attempt import InterPoints, Intersections, twoPTarea, GenerateCells, PlotCells, Rotate
 
 
 def dynamic_update_step(x, dt, A, B, L, gamma=3 / 5, grow=1, omega=1, mu=1 / 2):
