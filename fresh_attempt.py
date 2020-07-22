@@ -4,82 +4,7 @@ from matplotlib.patches import Ellipse
 import matplotlib.pyplot as plt
 
 
-def GenerateCells(N, A, B, L, resolution=5):
-    #   Generates a (5 x N) array of sizes (A, B), 2D-positions (x, y), and
-    #   orientations (phi) in [-Pi,Pi) of all the cells
-    pi = np.pi
 
-    C = np.vstack((A, B, L * random.rand(), L * random.rand(), pi * (random.rand() - 1 / 2), 1))
-    
-    def mindist(a, C):
-        d = []
-        for j in range(np.size(C, axis=1)):
-            d.append(np.sqrt((a[2] - C[2, j]) ** 2 + (a[3] - C[3, j]) ** 2))
-        return min(d)
-
-    n = 1
-    while n < N:
-
-        a = np.vstack((A, B, L * random.rand(), L * random.rand(), pi * (random.rand() - 1 / 2), 1))
-        if mindist(a, C) < min(A, B):
-            continue
-        
-        Cprime = np.hstack((C, a))
-
-        S = []
-        J = Intersections(Cprime, A, B, L)
-        for j in J[n]:
-            k = np.size(InterPoints(a[:,0], C[:, j]))
-            if k > 4:
-                S.append(j)
-
-
-        
-        if np.size(S) > 0:
-
-            i = 0
-            phi = a[4]
-            I = np.zeros(resolution)
-
-            while i < resolution:
-                S = []
-                J = Intersections(Cprime, A, B, L)
-                for j in J[n]:
-                    k = np.size(InterPoints(a[:,0], C[:, j]))
-                    if k > 4:
-                        S.append(j)
-                        
-                I[i] = np.size(S)
-                a[4] = phi + i * pi / resolution
-                Cprime = np.hstack((C, a))
-                i += 1
-
-            if min(I) == 0:
-                i = random.choice(np.where(I==0)[0])
-                a[4] = phi + i * pi / resolution
-# =============================================================================
-#                 fits = np.where(I==0)[0]
-#                 minplus = np.min(fits)
-#                 minminus = resolution - 1 - np.max(fits)
-#                 if min(minplus, minminus) == minplus:
-#                     a[4] = phi + minplus * pi / resolution
-#                 else:
-#                     a[4] = phi - minminus * pi / resolution
-#                 
-# =============================================================================
-
-                C = np.hstack((C, a))
-                n += 1
-            else:
-                continue
-
-        else:
-            C = np.hstack((C, a))
-            n += 1
-
-    x = [C]
-
-    return x
 
 
 def PlotCells(x, size):  # ellipse plotting module for cells (not final)
@@ -117,18 +42,18 @@ def Rotate(x, y, phi):
     return xR, yR
 
 
-def Coeff(A, B, h, k, phi):
+def Coeff(majorAxis, minorAxis, h, k, phi):
     #   returns equation coefficients describing ellipse 'j' relative to ellipse 'i'
 
     sinphi = np.sin(phi)
     cosphi = np.cos(phi)
 
-    AA = (cosphi / A) ** 2 + (sinphi / B) ** 2
-    BB = 2 * sinphi * cosphi / A ** 2 - 2 * sinphi * cosphi / B ** 2
-    CC = (sinphi / A) ** 2 + (cosphi / B) ** 2
-    DD = -2 * cosphi * (cosphi * h + sinphi * k) / A ** 2 + 2 * sinphi * (-sinphi * h + cosphi * k) / B ** 2
-    EE = -2 * sinphi * (cosphi * h + sinphi * k) / A ** 2 + 2 * cosphi * (sinphi * h - cosphi * k) / B ** 2
-    FF = ((cosphi * h + sinphi * k) / A) ** 2 + ((sinphi * h - cosphi * k) / B) ** 2 - 1
+    AA = (cosphi / majorAxis) ** 2 + (sinphi / minorAxis) ** 2
+    BB = 2 * sinphi * cosphi / majorAxis ** 2 - 2 * sinphi * cosphi / minorAxis ** 2
+    CC = (sinphi / majorAxis) ** 2 + (cosphi / minorAxis) ** 2
+    DD = -2 * cosphi * (cosphi * h + sinphi * k) / majorAxis ** 2 + 2 * sinphi * (-sinphi * h + cosphi * k) / minorAxis ** 2
+    EE = -2 * sinphi * (cosphi * h + sinphi * k) / majorAxis ** 2 + 2 * cosphi * (sinphi * h - cosphi * k) / minorAxis ** 2
+    FF = ((cosphi * h + sinphi * k) / majorAxis) ** 2 + ((sinphi * h - cosphi * k) / minorAxis) ** 2 - 1
 
     return AA, BB, CC, DD, EE, FF
 
@@ -230,9 +155,9 @@ def EllipseSegment(v, X, Y):
     #   Returns the area of an arc on the ellipse 'v' minus the area of the
     #   triangular segment of that arc
 
-    #   'v' is a vector of (A, B, h, k, phi)
-    #   A is semi-major axis
-    #   B is semi-minor axis
+    #   'v' is a vector of (majorAxis, minorAxis, h, k, phi)
+    #   majorAxis is semi-major axis
+    #   minorAxis is semi-minor axis
     #   (h,k) is the position of center of ellipse
     #   phi is the orientation of ellipse relative to x-axis
 
@@ -274,7 +199,7 @@ def EllipseSegment(v, X, Y):
 
 
 def InFrameEllipseSegment(v, x, y, theta):
-    #   in this case (X, Y) ARE relative to the ellipse, thus x<A and y<B
+    #   in this case (X, Y) ARE relative to the ellipse, thus x<majorAxis and y<minorAxis
 
     if theta[0] > theta[1]:
         theta[0] -= 2 * np.pi
@@ -425,24 +350,24 @@ def fourPTarea(a, b, x, y):
     return area1 + area2 + area3 + area4 + area5
 
 
-def BackgroundLattice(x, L, B):
+def BackgroundLattice(x, L, minorAxis):
     # Produces a Lattice on which one can approximate cell positions
 
     # x is vector of cell metadata (size, position, orientation)
     # L is width of simulation square
-    # B is short axis of ellipse
+    # minorAxis is short axis of ellipse
 
     def append_element(elements, x, y, N, value):
         # set (x,y) element in flattened 2D list
         elements[x + (y * (N + 1))].append(value)
 
-    a = B / L
+    a = minorAxis / L
     N = np.int(np.ceil(1 / a))
     BG = [[] for k in range((N + 1) ** 2)]
 
     for i in range(np.size(x, axis=1)):
-        Xi = int(np.floor(x[2, i] / B))
-        Yi = int(np.floor(x[3, i] / B))
+        Xi = int(np.floor(x[2, i] / minorAxis))
+        Yi = int(np.floor(x[3, i] / minorAxis))
 
         append_element(BG, Xi, Yi, N, i)
 
@@ -467,8 +392,8 @@ def BackgroundLattice(x, L, B):
 
 #     s4 = -27*(c**2) + 18*c*a*b + (a**2)*(b**2) - 4*(a**3)*c - 4*(b**3);
 
-#     A = np.array([[AA1,BB1/2,DD1/2],[BB1/2,CC1,EE1/2],[DD1/2,EE1/2,FF1]]);
-#     B = np.array([[AA2,BB2/2,DD2/2],[BB2/2,CC2,EE2/2],[DD2/2,EE2/2,FF2]]);
+#     majorAxis = np.array([[AA1,BB1/2,DD1/2],[BB1/2,CC1,EE1/2],[DD1/2,EE1/2,FF1]]);
+#     minorAxis = np.array([[AA2,BB2/2,DD2/2],[BB2/2,CC2,EE2/2],[DD2/2,EE2/2,FF2]]);
 
 #     if (s4<0):
 
@@ -484,8 +409,8 @@ def BackgroundLattice(x, L, B):
 #             u = (-a - np.sqrt(s2))/3;
 #             v = (-a + np.sqrt(s2))/3;
 
-#             M = u*A + B;
-#             N = v*A + B;
+#             M = u*majorAxis + minorAxis;
+#             N = v*majorAxis + minorAxis;
 
 #             M11 = minor(M,0,0);
 #             N11 = minor(N,0,0);
@@ -499,14 +424,14 @@ def BackgroundLattice(x, L, B):
 #     return RelPos, s4,s3,s2,s1
 
 
-def Intersections(x, A, B, L):
-    N = np.int(np.ceil(L / B))
-    r = int(np.ceil(A / B))
+def Intersections(x, majorAxis, minorAxis, L):
+    N = np.int(np.ceil(L / minorAxis))
+    r = int(np.ceil(majorAxis / minorAxis))
 
-    S = [[] for k in range(np.size(x, axis=1))]
+    intersectingCells = [[] for k in range(np.size(x, axis=1))]
 
     # set up coarse-grained background lattice (as a flattened array)
-    BG = BackgroundLattice(x, L, B)
+    BG = BackgroundLattice(x, L, minorAxis)
     
     
     # pad the lattice array with extra empty rows and columns for grid searching
@@ -532,11 +457,11 @@ def Intersections(x, A, B, L):
                 continue
 
     for i in range(np.size(x, axis=1)):
-        Xi, Yi = int(np.floor(x[2, i] / B)), int(np.floor(x[3, i] / B))
+        Xi, Yi = int(np.floor(x[2, i] / minorAxis)), int(np.floor(x[3, i] / minorAxis))
 
         for j in get_element(BG, Xi + r, Yi + r, N + 2 * r):
             if i != j:
-                S[i].append(j)
+                intersectingCells[i].append(j)
             else:
                 continue
 
@@ -547,10 +472,59 @@ def Intersections(x, A, B, L):
                 if dist > x[0, i] + x[0, j]:
                     continue
                 elif dist < x[1, i] + x[1, j]:
-                    S[i].append(j)
+                    intersectingCells[i].append(j)
                 elif np.size(InterPoints(x[:, i], x[:, j])) > 0:
-                    S[i].append(j)
+                    intersectingCells[i].append(j)
                 else:
                     continue
 
-    return S
+    return intersectingCells
+
+
+def Reproduce(x, attachments, tau, dt=1):
+    #   Creates new cells to add to the list of existing cells occupying space
+    #   tau is reproduction half-life per individual
+    #   this step does NOT update the time i.e. cells do not move in this update step
+
+    t = len(x) - 1
+    N = np.size(x[t], axis=1)
+    dn = np.random.poisson(N * dt / tau)
+    reproducingCells = np.random.choice(np.arange(N), dn, replace=False)
+    phis = np.random.normal(0, np.pi / 6, dn)
+
+    attachments.extend([[] for i in range(dn)])
+
+    for i in range(dn):
+
+        attachments[reproducingCells[i]].append(N - 1 + i)
+        attachments[N - 1 + i].append(reproducingCells[i])
+
+        # k gives a uniform chance of budding on either side of the mother cell
+        k = random.uniform()
+        if k < 0.5:
+
+            xmid, ymid = Rotate(x[t][0, reproducingCells[i]] * np.cos(phis[i]), x[t][1, reproducingCells[i]] * np.sin(phis[i]), x[t][4, reproducingCells[i]])
+            xmid += x[t][2, reproducingCells[i]]
+            ymid += x[t][3, reproducingCells[i]]
+
+            theta = x[t][4, reproducingCells[i]] + np.arctan(x[t][0, reproducingCells[i]] / x[t][1, reproducingCells[i]] * np.tan(phis[i]))
+
+            a0 = x[t][0, reproducingCells[i]] / 5
+            b0 = x[t][1, reproducingCells[i]] / 5
+            xcen = xmid + a0 * np.cos(theta)
+            ycen = ymid + b0 * np.sin(theta)
+
+        else:
+            xmid, ymid = Rotate(-x[t][0, reproducingCells[i]] * np.cos(phis[i]), -x[t][1, reproducingCells[i]] * np.sin(phis[i]), x[t][4, reproducingCells[i]])
+            xmid += x[t][2, reproducingCells[i]]
+            ymid += x[t][3, reproducingCells[i]]
+            theta = x[t][4, reproducingCells[i]] + np.arctan(x[t][0, reproducingCells[i]] / x[t][1, reproducingCells[i]] * np.tan(phis[i]))
+            a0 = x[t][0, reproducingCells[i]] / 5
+            b0 = x[t][1, reproducingCells[i]] / 5
+            xcen = xmid - a0 * np.cos(theta)
+            ycen = ymid - b0 * np.sin(theta)
+
+        x[t] = np.hstack((x[t], [[a0], [b0], [xcen], [ycen], [theta], [0]]))
+        x[t][5, reproducingCells[i]] += 1
+
+    return x, attachments
