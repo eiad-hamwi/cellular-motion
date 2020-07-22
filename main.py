@@ -7,21 +7,17 @@ from fresh_attempt import InterPoints, Intersections, twoPTarea, GenerateCells, 
 
 
 def dynamic_update_step(x, dt, A, B, L, rep=True, tau=10, grow=1, omega=1, mu=0.5):
-    eps = 1e-5
+    eps = 1e-5  
     t = len(x) - 1
-
+    N0 = np.size(x[t], axis=1)
+    
+    x.append(x[t])
     S = Intersections(x[t], A, B, L)
     
-    
-    Sprime = []
-    for i in S:
-        for j in i:
-            Sprime.append((i, j))
-    
 
-    x.append(x[t])
 
-    for i in range(np.size(x[t], axis=1)):
+
+    for i in range(N0):
 
         for j in S[i]:
             Xint, Yint = InterPoints(x[t + 1][:, i], x[t + 1][:, j])
@@ -114,9 +110,10 @@ def dynamic_update_step(x, dt, A, B, L, rep=True, tau=10, grow=1, omega=1, mu=0.
                     x[t + 1][5, i] = 1
 
     if rep:
-        x = Reproduce(x, tau, dt)
+        attachments = [[] for i in range(N0)]
+        x, attachments = Reproduce(x, attachments, tau, dt)
 
-    return S
+    return x
 
 
 def Reproduce(x, attachments, tau, dt=1):
