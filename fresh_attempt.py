@@ -4,26 +4,37 @@ from matplotlib.patches import Ellipse
 import matplotlib.pyplot as plt
 
 
-def GenerateCells(N, A, B, L, resolution=360):
+def GenerateCells(N, A, B, L, resolution=5):
     #   Generates a (5 x N) array of sizes (A, B), 2D-positions (x, y), and
     #   orientations (phi) in [-Pi,Pi) of all the cells
     pi = np.pi
 
     C = np.vstack((A, B, L * random.rand(), L * random.rand(), pi * (random.rand() - 1 / 2), 1))
+    
+    def mindist(a, C):
+        d = []
+        for j in range(np.size(C, axis=1)):
+            d.append(np.sqrt((a[2] - C[2, j]) ** 2 + (a[3] - C[3, j]) ** 2))
+        return min(d)
 
     n = 1
     while n < N:
 
         a = np.vstack((A, B, L * random.rand(), L * random.rand(), pi * (random.rand() - 1 / 2), 1))
+        if mindist(a, C) < min(A, B):
+            continue
+        
         Cprime = np.hstack((C, a))
 
         S = []
         J = Intersections(Cprime, A, B, L)
         for j in J[n]:
             k = np.size(InterPoints(a[:,0], C[:, j]))
-            if k == 8:
+            if k > 4:
                 S.append(j)
 
+
+        
         if np.size(S) > 0:
 
             i = 0
@@ -35,7 +46,7 @@ def GenerateCells(N, A, B, L, resolution=360):
                 J = Intersections(Cprime, A, B, L)
                 for j in J[n]:
                     k = np.size(InterPoints(a[:,0], C[:, j]))
-                    if k == 8:
+                    if k > 4:
                         S.append(j)
                         
                 I[i] = np.size(S)
@@ -44,14 +55,18 @@ def GenerateCells(N, A, B, L, resolution=360):
                 i += 1
 
             if min(I) == 0:
-                fits = np.where(I==0)[0]
-                minplus = np.min(fits)
-                minminus = resolution - 1 - np.max(fits)
-                if min(minplus, minminus) == minplus:
-                    a[4] = phi + minplus * pi / resolution
-                else:
-                    a[4] = phi - minminus * pi / resolution
-                
+                i = random.choice(np.where(I==0)[0])
+                a[4] = phi + i * pi / resolution
+# =============================================================================
+#                 fits = np.where(I==0)[0]
+#                 minplus = np.min(fits)
+#                 minminus = resolution - 1 - np.max(fits)
+#                 if min(minplus, minminus) == minplus:
+#                     a[4] = phi + minplus * pi / resolution
+#                 else:
+#                     a[4] = phi - minminus * pi / resolution
+#                 
+# =============================================================================
 
                 C = np.hstack((C, a))
                 n += 1
@@ -233,12 +248,16 @@ def EllipseSegment(v, X, Y):
         x_t, y_t = Translate(X[i], Y[i], -v[2], -v[3])
         x[i], y[i] = Rotate(x_t, y_t, -v[4])
 
-    if y[0] < 0:
+    if abs(x[0]) > v[0]:
+        theta1 = (1 - np.sign(x[0])) / 2 * np.pi
+    elif y[0] < 0:
         theta1 = 2 * np.pi - np.arccos(x[0] / v[0])
     else:
         theta1 = np.arccos(x[0] / v[0])
 
-    if y[1] < 0:
+    if abs(x[1]) > v[0]:
+        theta2 = (1 - np.sign(x[1])) / 2 * np.pi
+    elif y[1] < 0:
         theta2 = 2 * np.pi - np.arccos(x[1] / v[0])
     else:
         theta2 = np.arccos(x[1] / v[0])
@@ -269,7 +288,6 @@ def InFrameEllipseSegment(v, x, y, theta):
 
 
 def twoPTarea(a, b, X, Y):
-    maxArea = min(np.pi * a[0] * a[1], np.pi * b[0] * b[1])
     xint = np.zeros(2)
     yint = np.zeros(2)
     theta = np.zeros(2)
@@ -279,7 +297,9 @@ def twoPTarea(a, b, X, Y):
         xint[i], yint[i] = Rotate(x_t, y_t, -a[4])
 
     for i in range(2):
-        if xint[i] < 0:
+        if abs(xint[i]) > a[0]:
+            theta[i] = (1 - np.sign(xint[i])) / 2 * np.pi
+        elif yint[i] < 0:
             theta[i] = 2 * np.pi - np.arccos(xint[i] / a[0])
         else:
             theta[i] = np.arccos(xint[i] / a[0])
@@ -421,10 +441,10 @@ def BackgroundLattice(x, L, B):
     BG = [[] for k in range((N + 1) ** 2)]
 
     for i in range(np.size(x, axis=1)):
-        x1 = int(np.floor(x[2, i] / B))
-        y1 = int(np.floor(x[3, i] / B))
+        Xi = int(np.floor(x[2, i] / B))
+        Yi = int(np.floor(x[3, i] / B))
 
-        append_element(BG, x1, y1, N, i)
+        append_element(BG, Xi, Yi, N, i)
 
     return BG
 
@@ -485,13 +505,18 @@ def Intersections(x, A, B, L):
 
     S = [[] for k in range(np.size(x, axis=1))]
 
+    # set up coarse-grained background lattice (as a flattened array)
     BG = BackgroundLattice(x, L, B)
+    
+    
+    # pad the lattice array with extra empty rows and columns for grid searching
     BG[(N + 1) ** 2:(N + 1) ** 2] = [[] for i in range(r * (N + 2 * r + 1))]
     for i in range(N, -1, -1):
         BG[(i + 1) * (N + 1):(i + 1) * (N + 1)] = [[] for k in range(r)]
         BG[i * (N + 1):i * (N + 1)] = [[] for k in range(r)]
     BG[:0] = [[] for i in range(r * (N + 2 * r + 1))]
 
+    # retrieval function from flattened array
     def get_element(elements, x, y, N):
         # get (x,y) element from flattened 2D list
         return elements[x + (y * (N + 1))]
@@ -516,7 +541,7 @@ def Intersections(x, A, B, L):
                 continue
 
         for (k, l) in I:
-            for j in get_element(BG, (Xi + r) + k, (Yi + r) + l, N + 2 * r - 1):
+            for j in get_element(BG, (Xi + r) + k, (Yi + r) + l, N + 2 * r):
                 dist = np.sqrt((x[2, i] - x[2, j]) ** 2 + (x[3, i] - x[3, j]) ** 2)
 
                 if dist > x[0, i] + x[0, j]:

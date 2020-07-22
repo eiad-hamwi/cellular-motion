@@ -3,14 +3,21 @@ from numpy import random
 from matplotlib.patches import Ellipse
 import matplotlib.pyplot as plt
 
-from fresh_attempt import InterPoints, Intersections, twoPTarea, GenerateCells, PlotCells, Rotate
+from fresh_attempt import InterPoints, Intersections, twoPTarea, GenerateCells, Rotate
 
 
-def dynamic_update_step(x, dt, A, B, L, gamma=3 / 5, grow=1, omega=1, mu=1 / 2):
-    eps = 1e-4
+def dynamic_update_step(x, dt, A, B, L, rep=True, tau=10, grow=1, omega=1, mu=0.5):
+    eps = 1e-5
     t = len(x) - 1
 
     S = Intersections(x[t], A, B, L)
+    
+    
+    Sprime = []
+    for i in S:
+        for j in i:
+            Sprime.append((i, j))
+    
 
     x.append(x[t])
 
@@ -68,19 +75,10 @@ def dynamic_update_step(x, dt, A, B, L, gamma=3 / 5, grow=1, omega=1, mu=1 / 2):
                 torque = radialX * forceY - radialY * forceX
 
             elif n == 4:
-                print('4pt intersection')
+                print('4pt intersection ({0}, {1})'.format(i, j))
                 forceX = 0
                 forceY = 0
                 torque = 0
-                # area = fourPTarea(x[t][:, i], x[t][:, j], Xint, Yint)
-                # m1 = (Xint[0] - Xint[2]) / (Yint[2] - Yint[0])  # reciprocal slope of first diagonal
-                # m2 = (Xint[1] - Xint[3]) / (Yint[3] - Yint[1])  # reciprocal slope of second diagonal
-                # radialX1 = (Xint[0] + Xint[2]) / 2 - x1
-                # radialY1 = (Yint[0] + Yint[2]) / 2 - y1
-                # radialX2 = (Xint[1] + Xint[3]) / 2 - x1
-                # radialY2 = (Yint[1] + Yint[3]) / 2 - y1
-                # forceX = -np.sign(radialX1) * area / np.sqrt(1 + m1 ** 2)
-                # forceY = -np.sign(radialY1) * np.sqrt(area ** 2 - forceX1 ** 2)
 
             elif dist < (x[t + 1][1, i] + x[t + 1][1, j]):
                 area = np.pi * min(x[t + 1][0, i] * x[t + 1][1, i], x[t + 1][0, j] * x[t + 1][1, j])
@@ -100,6 +98,9 @@ def dynamic_update_step(x, dt, A, B, L, gamma=3 / 5, grow=1, omega=1, mu=1 / 2):
             x[t + 1][2, j] -= mu * forceX * dt * A * B / A2 / B2
             x[t + 1][3, j] -= mu * forceY * dt * A * B / A2 / B2
             x[t + 1][4, j] -= 4 * mu * torque * dt / (A2 ** 2 + B2 ** 2)
+            
+
+        # growing the daughter cells in the G2 growth phase
 
         if x[t + 1][5, i] == 0:
             if x[t + 1][0, i] < A:
@@ -111,24 +112,30 @@ def dynamic_update_step(x, dt, A, B, L, gamma=3 / 5, grow=1, omega=1, mu=1 / 2):
                     x[t + 1][1, i] += B * omega * grow * x[t + 1][1, i] * dt
                 else:
                     x[t + 1][5, i] = 1
-                    
-    x = Reproduce(x, gamma, dt)
 
-    return x
+    if rep:
+        x = Reproduce(x, tau, dt)
+
+    return S
 
 
-def Reproduce(x, gamma, dt=1):
+def Reproduce(x, attachments, tau, dt=1):
     #   Creates new cells to add to the list of existing cells occupying space
-    #   gamma is reproduction rate per individual per unit time (time step)
+    #   tau is reproduction half-life per individual
     #   this step does NOT update the time i.e. cells do not move in this update step
 
     t = len(x) - 1
     N = np.size(x[t], axis=1)
-    dn = np.random.poisson(N * dt / gamma)
+    dn = np.random.poisson(N * dt / tau)
     S = np.random.choice(np.arange(N), dn, replace=False)
     phis = np.random.normal(0, np.pi / 6, dn)
 
+    attachments.extend([[] for i in range(dn)])
+
     for i in range(dn):
+
+        attachments[S[i]].append(N - 1 + i)
+
         k = random.uniform()
         if k < 0.5:
             xmid, ymid = Rotate(x[t][0, S[i]] * np.cos(phis[i]), x[t][1, S[i]] * np.sin(phis[i]), x[t][4, S[i]])
@@ -150,17 +157,25 @@ def Reproduce(x, gamma, dt=1):
         x[t] = np.hstack((x[t], [[r0], [r0], [xcen], [ycen], [theta], [0]]))
         x[t][5, S[i]] += 1
 
-    return x
+    return x, attachments
 
 
-# x = GenerateCells(200, 1, 2, 10, 3)
-# PlotCells(x[0], 10)
-# S = [[] for i in range(np.size(x[0], axis=1))]
-# for i in range(np.size(x[0], axis=1)):
-#     for j in range(np.size(x[0], axis=1)):
-#         k = np.size(InterPoints(x[0][:, i], x[0][:, j]))
-#         if k==4 or k==8:
-#             S[i].append(k)
-# print(S)
-# x = dynamic_update_step(x, 0.05, 0.5, 0.25, 10)
-# PlotCells(x[1], 10)
+def add_ellipse(x, A, B, X, Y, theta):
+    return np.hstack((x, np.vstack((A, B, X, Y, theta, 1))))
+
+
+def PlotCells(x, size):  # ellipse plotting module for cells (not final)
+
+    ells = [Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i]) for i in
+            range(np.size(x, axis=1))]
+
+    fig = plt.figure(0)
+
+    ax = fig.add_subplot(111, aspect='equal')
+    for e in ells:
+        ax.add_artist(e)
+
+    ax.set_xlim(-size, size)
+    ax.set_ylim(-size, size)
+
+    return np.size(ells)
