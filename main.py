@@ -3,98 +3,90 @@ from numpy import random
 from matplotlib.patches import Ellipse
 import matplotlib.pyplot as plt
 
-from fresh_attempt import InterPoints, Intersections, twoPTarea, Reproduce, Rotate
+import fresh_attempt
 
 
 def GenerateCells(N, majorAxis, minorAxis, L, resolution=5):
-    #   Generates a (5 x N) array of sizes (majorAxis, minorAxis), 2D-positions (x, y), and
-    #   orientations (phi) in [-Pi,Pi) of all the cells
+    #   Generates a (7 x N) array of cell configurations [majorAxis, minorAxis, 2D-positions (x, y), orientations (phi) 
+    #   in [-Pi,Pi), Reproduction Number, and time-to-budding] of all the N cells
     pi = np.pi
 
-    C = np.vstack((majorAxis, minorAxis, L * random.rand(), L * random.rand(), pi * (random.rand() - 1 / 2), 1))
+    Cells = np.vstack((majorAxis, minorAxis, L * random.rand(), L * random.rand(), pi * (random.rand() - 1 / 2), 1, 40 * random.rand()))
 
-    def mindist(a, C):
-        d = []
-        for j in range(np.size(C, axis=1)):
-            d.append(np.sqrt((a[2] - C[2, j]) ** 2 + (a[3] - C[3, j]) ** 2))
-        return min(d)
+    # find minimum distance between new cell 'testCell' and other cells 'Cells
+    def mindist(testCell, Cells):
+        return min(np.sqrt((Cells[2, :] - testCell[2, 0]) ** 2 + (Cells[3, :] - testCell[3, 0]) ** 2))
 
     n = 1
     while n < N:
 
-        a = np.vstack((majorAxis, minorAxis, L * random.rand(), L * random.rand(), pi * (random.rand() - 1 / 2), 1))
-        if mindist(a, C) < minorAxis:
+        testCell = np.vstack(
+            (majorAxis, minorAxis, L * random.rand(), L * random.rand(), pi * (random.rand() - 1 / 2), 1, 40 * random.rand()))
+        if mindist(testCell, Cells) < minorAxis:
             continue
 
         # Intersections func 
-        Cprime = np.hstack((C, a))
+        Cprime = np.hstack((Cells, testCell))
 
         S = []
-        intersectingCells = Intersections(Cprime, majorAxis, minorAxis, L)
+        intersectingCells = fresh_attempt.Intersections(Cprime, majorAxis, minorAxis, L)
         for j in intersectingCells[n]:
-            k = np.size(InterPoints(a[:, 0], C[:, j]))
+            k = np.size(fresh_attempt.InterPoints(testCell[:, 0], Cells[:, j]))
             if k > 4:
                 S.append(j)
 
         if np.size(S) > 0:
 
             i = 0
-            phi = a[4]
-            I = np.zeros(resolution)
+            phi = testCell[4]
+            possibleOrientations = np.zeros(resolution)
 
             while i < resolution:
                 S = []
-                intersectingCells = Intersections(Cprime, majorAxis, minorAxis, L)
+                intersectingCells = fresh_attempt.Intersections(Cprime, majorAxis, minorAxis, L)
                 for j in intersectingCells[n]:
-                    k = np.size(InterPoints(a[:, 0], C[:, j]))
+                    k = np.size(fresh_attempt.InterPoints(testCell[:, 0], Cells[:, j]))
                     if k > 4:
                         S.append(j)
 
-                I[i] = np.size(S)
-                a[4] = phi + i * pi / resolution
-                Cprime = np.hstack((C, a))
+                possibleOrientations[i] = np.size(S)
+                testCell[4] = phi + i * pi / resolution
+                Cprime = np.hstack((Cells, testCell))
                 i += 1
 
-            if min(I) == 0:
-                i = random.choice(np.where(I == 0)[0])
-                a[4] = phi + i * pi / resolution
-                # =============================================================================
-                #                 fits = np.where(I==0)[0]
-                #                 minplus = np.min(fits)
-                #                 minminus = resolution - 1 - np.max(fits)
-                #                 if min(minplus, minminus) == minplus:
-                #                     a[4] = phi + minplus * pi / resolution
-                #                 else:
-                #                     a[4] = phi - minminus * pi / resolution
-                #                 
-                # =============================================================================
-
-                C = np.hstack((C, a))
+            if min(possibleOrientations) == 0:
+                i = random.choice(np.where(possibleOrientations == 0)[0])
+                testCell[4] = phi + i * pi / resolution
+                Cells = np.hstack((Cells, testCell))
                 n += 1
             else:
                 continue
 
         else:
-            C = np.hstack((C, a))
+            Cells = np.hstack((Cells, testCell))
             n += 1
 
-    x = [C]
+    x = [Cells]
 
     return x
 
 
-def dynamic_update_step(x, dt, majorAxis, minorAxis, L, rep=True, tau=10, elongationRate=1, sigma=1, mu=0.5):
+def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, tau=10, elongationRate=0.02, sigma=1,
+                        mu=0.5):
     eps = 1e-5
     t = len(x) - 1
     N0 = np.size(x[t], axis=1)
 
-    x.append(x[t])
-    S = Intersections(x[t], majorAxis, minorAxis, L)
+    x.append(x[t].copy())
+    S = fresh_attempt.Intersections(x[t], majorAxis, minorAxis, L)
 
+    # loop over cells adult cells
     for i in range(N0):
 
+        x[t + 1][6, i] -= dt
+
         for j in S[i]:
-            Xint, Yint = InterPoints(x[t + 1][:, i], x[t + 1][:, j])
+            Xint, Yint = fresh_attempt.InterPoints(x[t + 1][:, i], x[t + 1][:, j], eps)
             n = np.size(Xint)
             A1, B1, x1, y1 = x[t + 1][0:4, i]
             A2, B2, x2, y2 = x[t + 1][0:4, j]
@@ -102,8 +94,14 @@ def dynamic_update_step(x, dt, majorAxis, minorAxis, L, rep=True, tau=10, elonga
             delY = y1 - y2
             dist = np.sqrt(delX ** 2 + delY ** 2)
 
-            if n == 2:
-                area = twoPTarea(x[t + 1][:, i], x[t + 1][:, j], Xint, Yint)
+            if np.size(Xint) != np.size(Yint):
+                area = fresh_attempt.ShapelyArea(x[t + 1][:, i], x[t + 1][:, j])
+                forceX = area * (x1 - x2)/np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+                forceY = area * (y1 - y2) / np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+                torque = 0
+
+            elif n == 2:
+                area = fresh_attempt.twoPTarea(x[t + 1][:, i], x[t + 1][:, j], Xint, Yint)
                 radialX = np.average(Xint) - x1
                 radialY = np.average(Yint) - y1
 
@@ -124,9 +122,9 @@ def dynamic_update_step(x, dt, majorAxis, minorAxis, L, rep=True, tau=10, elonga
                             sgn = -1
 
                 else:
-                    m = (Yint[1] - Yint[0]) / (Xint[0] - Xint[1])
-                    a = np.sin(np.arctan(m))
-                    b = np.cos(np.arctan(m))
+                    m = (Xint[1] - Xint[0]) / (Yint[0] - Yint[1])
+                    a = np.cos(np.arctan(m))
+                    b = np.sin(np.arctan(m))
 
                     if dist > (x[t + 1][1, i] + x[t + 1][1, j]):
                         if a * radialX + b * radialY < 0:
@@ -169,9 +167,13 @@ def dynamic_update_step(x, dt, majorAxis, minorAxis, L, rep=True, tau=10, elonga
             x[t + 1][3, j] -= mu * forceY * dt * majorAxis * minorAxis / A2 / B2
             x[t + 1][4, j] -= 4 * mu * torque * dt / (A2 ** 2 + B2 ** 2)
 
+
+        if x[t + 1][5, i] > 0:
+            
+            x[t + 1][6, i] -= dt
+
         # growing the daughter cells in the G2 growth phase
         # (elongationRate) variable depends on the local concentration of nutrients
-
         if x[t + 1][5, i] == 0:
 
             if x[t + 1][0, i] < majorAxis:
@@ -179,13 +181,16 @@ def dynamic_update_step(x, dt, majorAxis, minorAxis, L, rep=True, tau=10, elonga
                 x[t + 1][0, i] += elongationRate * dt
                 x[t + 1][1, i] += minorAxis / majorAxis * elongationRate * dt
 
+            # daughter cell finishes growing, detaches and becomes adult cell
             else:
                 x[t + 1][5, i] = 1
-                attachments[].delete()
+                x[t + 1][6, i] = 40
+                attachments[attachments[i][0]].remove(i)
+                attachments[i].remove(attachments[i][0])
 
     if rep:
         attachments = [[] for i in range(N0)]
-        x, attachments = Reproduce(x, attachments, tau, dt)
+        x, attachments = fresh_attempt.Reproduce(x, attachments, tau, dt)
 
     return x
 
@@ -194,7 +199,7 @@ def add_ellipse(x, majorAxis, minorAxis, X, Y, theta):
     return np.hstack((x, np.vstack((majorAxis, minorAxis, X, Y, theta, 1))))
 
 
-def PlotCells(x, size):  # ellipse plotting module for cells (not final)
+def PlootCells(x, size):  # ellipse plotting module for cells (not final)
 
     ells = [Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i]) for i in
             range(np.size(x, axis=1))]

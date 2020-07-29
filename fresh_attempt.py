@@ -1,10 +1,10 @@
 import numpy as np
 from numpy import random
 from matplotlib.patches import Ellipse
-import matplotlib.pyplot as plt
-
-
-
+from matplotlib import pyplot as plt
+from shapely.geometry import Point
+from shapely import affinity
+from matplotlib.patches import Polygon
 
 
 def PlotCells(x, size):  # ellipse plotting module for cells (not final)
@@ -42,17 +42,39 @@ def Rotate(x, y, phi):
     return xR, yR
 
 
-def Coeff(majorAxis, minorAxis, h, k, phi):
-    #   returns equation coefficients describing ellipse 'j' relative to ellipse 'i'
+# def Coeff(majorAxis, minorAxis, h, k, phi):
+#     #   returns equation coefficients describing ellipse centered at (h, k) with orientation phi CCW relative to +x axis
+#
+#     sinphi = np.sin(phi)
+#     cosphi = np.cos(phi)
+#
+#     AA = (cosphi / majorAxis) ** 2 + (sinphi / minorAxis) ** 2
+#     BB = 2 * sinphi * cosphi / majorAxis ** 2 - 2 * sinphi * cosphi / minorAxis ** 2
+#     CC = (sinphi / majorAxis) ** 2 + (cosphi / minorAxis) ** 2
+#     DD = -2 * cosphi * (cosphi * h + sinphi * k) / majorAxis ** 2 + 2 * sinphi * (-sinphi * h + cosphi * k) / minorAxis ** 2
+#     EE = -2 * sinphi * (cosphi * h + sinphi * k) / majorAxis ** 2 + 2 * cosphi * (sinphi * h - cosphi * k) / minorAxis ** 2
+#     FF = ((cosphi * h + sinphi * k) / majorAxis) ** 2 + ((sinphi * h - cosphi * k) / minorAxis) ** 2 - 1
+#
+#     return AA, BB, CC, DD, EE, FF
 
+def Coeff(v):
+    #   returns equation coefficients describing ellipse centered at (h, k) with orientation phi CCW relative to +x axis
+
+    majorAxis = v[0]
+    minorAxis = v[1]
+    h = v[2]
+    k = v[3]
+    phi = v[4]
     sinphi = np.sin(phi)
     cosphi = np.cos(phi)
 
     AA = (cosphi / majorAxis) ** 2 + (sinphi / minorAxis) ** 2
     BB = 2 * sinphi * cosphi / majorAxis ** 2 - 2 * sinphi * cosphi / minorAxis ** 2
     CC = (sinphi / majorAxis) ** 2 + (cosphi / minorAxis) ** 2
-    DD = -2 * cosphi * (cosphi * h + sinphi * k) / majorAxis ** 2 + 2 * sinphi * (-sinphi * h + cosphi * k) / minorAxis ** 2
-    EE = -2 * sinphi * (cosphi * h + sinphi * k) / majorAxis ** 2 + 2 * cosphi * (sinphi * h - cosphi * k) / minorAxis ** 2
+    DD = -2 * cosphi * (cosphi * h + sinphi * k) / majorAxis ** 2 + 2 * sinphi * (
+                -sinphi * h + cosphi * k) / minorAxis ** 2
+    EE = -2 * sinphi * (cosphi * h + sinphi * k) / majorAxis ** 2 + 2 * cosphi * (
+                sinphi * h - cosphi * k) / minorAxis ** 2
     FF = ((cosphi * h + sinphi * k) / majorAxis) ** 2 + ((sinphi * h - cosphi * k) / minorAxis) ** 2 - 1
 
     return AA, BB, CC, DD, EE, FF
@@ -61,23 +83,22 @@ def Coeff(majorAxis, minorAxis, h, k, phi):
 def SolveX(y, V):
     #   solves for values of x for a point (x,y) on ellipse vector V
 
-    (AA, BB, CC, DD, EE, FF) = Coeff(V[0], V[1], V[2], V[3], V[4])
+    (AA, BB, CC, DD, EE, FF) = Coeff(V)
 
     return np.roots([AA, BB * y + DD, CC * (y ** 2) + EE * y + FF])
 
 
-def InterPoints(a, b):
+def InterPoints(a, b, eps=1e-5):
     #   Finds the points of intersection between two ellipse vectors 'a' and 'b'
 
-    eps = 1e-8
     #   a[0] = A1;            b[0] = A2;
     #   a[1] = B1;            b[1] = B2;
     #   a[2] = x1;            b[2] = x2;
     #   a[3] = y1;            b[3] = y2;
     #   a[4] = phi1;          b[4] = phi2;
 
-    (AA1, BB1, CC1, DD1, EE1, FF1) = Coeff(a[0], a[1], a[2], a[3], a[4])
-    (AA2, BB2, CC2, DD2, EE2, FF2) = Coeff(b[0], b[1], b[2], b[3], b[4])
+    (AA1, BB1, CC1, DD1, EE1, FF1) = Coeff(a)
+    (AA2, BB2, CC2, DD2, EE2, FF2) = Coeff(b)
 
     cy = np.zeros(5)
     cy[4] = (BB1 * CC2 - CC1 * BB2) * (AA1 * BB2 - BB1 * AA2) - (AA1 * CC2 - CC1 * AA2) ** 2
@@ -119,43 +140,29 @@ def InterPoints(a, b):
         r = np.array([])
         N = 0
 
-    n = 0  # counting real intersections
+    X1 = np.array([])
+    X2 = np.array([])
     Y = []
-    X1 = []
-    X2 = []
 
     for i in range(N):
         if abs(np.imag(r[i])) < eps:
-            n += 1
-            Y = np.hstack((Y, np.real(r[i])))
             X1 = np.hstack((X1, SolveX(np.real(r[i]), a)))
             X2 = np.hstack((X2, SolveX(np.real(r[i]), b)))
+            Y = np.hstack((Y, np.real(r[i])))
 
-    X = []
+    X = X1[(np.abs(X2[:, None] - X1) < eps).any(0)]
 
-    j0 = -1
-    for i in range(2 * n):
-        j = 0
-        while abs(X1[i] - X2[j]) > eps:
-            if j == 2 * n - 1:
-                break
-            elif (j + 1 == j0) and (j0 != 2 * n - 1):
-                j += 2
-            else:
-                j += 1
-        if abs(X1[i] - X2[j]) < eps:
-            if abs(np.imag(X1[i])) < eps:
-                X = np.hstack((X, np.real(X1[i])))
-                j0 = j
+    #if np.size(X) != np.size(Y):
+    #    print(np.array([[X1, X2], [X, Y]]))
 
     return X, Y
 
 
-def EllipseSegment(v, X, Y):
+def EllipseSegment(a, X, Y, test=False, b=None):
     #   Returns the area of an arc on the ellipse 'v' minus the area of the
     #   triangular segment of that arc
 
-    #   'v' is a vector of (majorAxis, minorAxis, h, k, phi)
+    #   'a' is a vector of (majorAxis, minorAxis, h, k, phi, ...)
     #   majorAxis is semi-major axis
     #   minorAxis is semi-minor axis
     #   (h,k) is the position of center of ellipse
@@ -163,39 +170,57 @@ def EllipseSegment(v, X, Y):
 
     #   X, Y are (ordered) vectors of the intersection points (X_i), (Y_i)
     #   X, Y are not relative to the ellipse, thus have no constraints on magnitude
-
-    x = np.zeros(np.size(X))
-    y = np.zeros(np.size(Y))
+    #   The arc is obtained by traversing the ellipse from (X1, Y1) to (X2, Y2)
 
     #   rotating and translating points in (X, Y) to the ellipse frame of reference
 
-    for i in range(np.size(X)):
-        x_t, y_t = Translate(X[i], Y[i], -v[2], -v[3])
-        x[i], y[i] = Rotate(x_t, y_t, -v[4])
+    x = (X - a[2]) * np.cos(a[4]) + (Y - a[3]) * np.sin(a[4])
+    y = -(X - a[2]) * np.sin(a[4]) + (Y - a[3]) * np.cos(a[4])
+    theta = np.zeros(2)
 
-    if abs(x[0]) > v[0]:
-        theta1 = (1 - np.sign(x[0])) / 2 * np.pi
-    elif y[0] < 0:
-        theta1 = 2 * np.pi - np.arccos(x[0] / v[0])
-    else:
-        theta1 = np.arccos(x[0] / v[0])
+    for i in range(2):
+        if abs(x[i]) > a[0]:
+            x[i] = np.sign(x[i]) * a[0]
+        if y[i] < 0:
+            theta[i] = 2 * np.pi - np.arccos(x[i] / a[0])
+        else:
+            theta[i] = np.arccos(x[i] / a[0])
 
-    if abs(x[1]) > v[0]:
-        theta2 = (1 - np.sign(x[1])) / 2 * np.pi
-    elif y[1] < 0:
-        theta2 = 2 * np.pi - np.arccos(x[1] / v[0])
-    else:
-        theta2 = np.arccos(x[1] / v[0])
+    #   rearrange set of points (X,Y) if midpoint is outside second ellipse
+    #   this is to ensure correct direction of integration for the overlap area
+    if test:
+        if theta[0] > theta[1]:
+            tmp = theta[0]
+            theta[0] = theta[1]
+            theta[1] = tmp
 
-    if theta1 > theta2:
-        theta1 -= 2 * np.pi
+        #   find midpoint in ellipse reference frame
+        xmid = a[0] * np.cos((theta[0] + theta[1]) / 2)
+        ymid = a[1] * np.sin((theta[0] + theta[1]) / 2)
 
-    if (theta2 - theta1) > np.pi:
+        #   transform to background frame
+        xtr = xmid * np.cos(a[4]) - ymid * np.sin(a[4]) + a[2]
+        ytr = xmid * np.sin(a[4]) + ymid * np.cos(a[4]) + a[3]
+
+        #   finds polynomial coeffiecients for ellipse 'b'
+        AA, BB, CC, DD, EE, FF = Coeff(b)
+
+        #   tests whether midpoint is outside ellipse
+        if AA * xtr ** 2 + BB * xtr * ytr + CC * ytr ** 2 + DD * xtr + EE * ytr + FF > 0:
+            #   rearrange the order of points (x1, y1) and (x2, y2) since theta represents this
+            tmp = theta[0]
+            theta[0] = theta[1]
+            theta[1] = tmp
+
+    if theta[0] > theta[1]:
+        theta[0] -= 2 * np.pi
+
+    if (theta[1] - theta[0]) > np.pi:
         trsign = 1.0
     else:
         trsign = -1.0
 
-    return 0.5 * (v[0] * v[1] * (theta2 - theta1) + trsign * abs(x[0] * y[1] - x[1] * y[0]))
+    return 0.5 * (a[0] * a[1] * (theta[1] - theta[0]) + trsign * abs(x[0] * y[1] - x[1] * y[0]))
 
 
 def InFrameEllipseSegment(v, x, y, theta):
@@ -213,141 +238,128 @@ def InFrameEllipseSegment(v, x, y, theta):
 
 
 def twoPTarea(a, b, X, Y):
-    xint = np.zeros(2)
-    yint = np.zeros(2)
-    theta = np.zeros(2)
+    area1 = EllipseSegment(a, X, Y, True, b)
+    area2 = EllipseSegment(b, X, Y, True, a)
 
-    for i in range(2):
-        x_t, y_t = Translate(X[i], Y[i], -a[2], -a[3])
-        xint[i], yint[i] = Rotate(x_t, y_t, -a[4])
+    return area1 + area2
 
-    for i in range(2):
-        if abs(xint[i]) > a[0]:
-            theta[i] = (1 - np.sign(xint[i])) / 2 * np.pi
-        elif yint[i] < 0:
-            theta[i] = 2 * np.pi - np.arccos(xint[i] / a[0])
-        else:
-            theta[i] = np.arccos(xint[i] / a[0])
 
-    if theta[0] > theta[1]:
-        tmp = theta[0]
-        theta[0] = theta[1]
-        theta[1] = tmp
+def create_ellipse(v):
 
-    xmid = a[0] * np.cos((theta[0] + theta[1]) / 2)
-    ymid = a[1] * np.sin((theta[0] + theta[1]) / 2)
+    center = (v[2], v[3])
+    lengths = (v[0], v[1])
+    angle = v[4] * 180 / np.pi
 
-    AA, BB, CC, DD, EE, FF = Coeff(b[0], b[1], b[2] - a[2], b[3] - a[3], b[4] - a[4])
+    circ = Point(center).buffer(1)
+    ell = affinity.scale(circ, int(lengths[0]), int(lengths[1]))
+    ellr = affinity.rotate(ell, angle)
 
-    if AA * xmid ** 2 + BB * xmid * ymid + CC * ymid ** 2 + DD * xmid + EE * ymid + FF > 0:
-        tmp = theta[0]
-        theta[0] = theta[1]
-        theta[1] = tmp
+    return ellr
 
-    if theta[0] > theta[1]:
-        theta[0] -= 2 * np.pi
-    if theta[1] - theta[0] > np.pi:
-        trsign = 1
-    else:
-        trsign = -1
 
-    OverallArea = (a[0] * a[1] * (theta[1] - theta[0]) + trsign * abs(xint[0] * yint[1] - xint[1] * yint[0])) / 2
+def ShapelyArea(a, b):
 
-    return OverallArea
+    ellipse1 = create_ellipse(a)
+    ellipse2 = create_ellipse(b)
+    intersect = ellipse1.intersection(ellipse2)
 
-def fourPTarea(a, b, x, y):
-    # returns the overlap area with 4 intersection points (Xint, Yint)
+    return intersect.area
 
-    # input values (Xint, Yint) relative to one ellipse
 
-    A1, B1 = a[0], a[1]
-    A2, B2 = b[0], b[1]
-    phi1, phi2 = a[4], b[4]
-    h1, k1, h2, k2 = a[2], a[3], b[2], b[3]
-    AA, BB, CC, DD, EE, FF = Coeff(A2, B2, h2 - h1, k2 - k1, phi2 - phi1)
-
-    xint = []
-    yint = []
-    xint_tr = []
-    yint_tr = []
-    theta = np.zeros(4)
-    theta_tr = np.zeros(4)
-
-    for i in range(4):
-        xa_t, ya_t = Translate(x[i], y[i], -h1, -k1)
-        xint, yint = np.hstack((xint, Rotate(xa_t, ya_t, -phi1)[0])), np.hstack((yint, Rotate(xa_t, ya_t, -phi1)[1]))
-        xb_t, yb_t = Translate(x[i], y[i], -h2, -k2)
-        xint_tr, yint_tr = np.hstack((xint_tr, Rotate(xb_t, yb_t, -phi2)[0])), np.hstack(
-            (yint_tr, Rotate(xb_t, yb_t, -phi2)[1]))
-
-    for i in range(4):
-        if yint[i] < 0:
-            theta[i] = 2 * np.pi - np.arccos(xint[i] / A1)
-        else:
-            theta[i] = np.arccos(xint[i] / A1)
-
-        if yint_tr[i] < 0:
-            theta_tr[i] = 2 * np.pi - np.arccos(xint_tr[i] / A2)
-        else:
-            theta_tr[i] = np.arccos(xint_tr[i] / A2)
-
-    #   re-arranging in counter-clockewise order
-
-    for i in range(1, 4):
-
-        tmp00 = theta[i]
-        tmp01 = theta_tr[i]
-        tmp10 = xint[i]
-        tmp11 = xint_tr[i]
-        tmp20 = yint[i]
-        tmp21 = yint_tr[i]
-
-        for k in range(i - 1, -1, -1):
-
-            if theta[k] > theta[k + 1]:
-                theta[k + 1] = theta[k]
-                theta_tr[k + 1] = theta_tr[k]
-                xint[k + 1] = xint[k]
-                xint_tr[k + 1] = xint_tr[k]
-                yint[k + 1] = yint[k]
-                yint_tr[k + 1] = yint_tr[k]
-                theta[k] = tmp00
-                theta_tr[k] = tmp01
-                xint[k] = tmp10
-                xint_tr[k] = tmp11
-                yint[k] = tmp20
-                yint_tr[k] = tmp21
-
-            else:
-                break
-
-    area1 = 0.5 * abs((xint[2] - xint[0]) * (yint[3] - yint[1]) - (xint[3] - xint[1]) * (yint[2] - yint[0]))
-
-    xmid = A1 * np.cos((theta[0] + theta[1]) / 2)
-    ymid = B1 * np.sin((theta[0] + theta[1]) / 2)
-
-    if AA * xmid ** 2 + BB * xmid * ymid + CC * ymid ** 2 + DD * xmid + EE * ymid + FF < 0:
-        area2 = InFrameEllipseSegment(a, xint[[0, 1]], yint[[0, 1]], theta[[0, 1]])
-        area3 = InFrameEllipseSegment(a, xint[[2, 3]], yint[[2, 3]], theta[[2, 3]])
-        area4 = InFrameEllipseSegment(b, xint_tr[[1, 2]], yint_tr[[1, 2]], theta_tr[[1, 2]])
-        area5 = InFrameEllipseSegment(b, xint_tr[[3, 0]], yint_tr[[3, 0]], theta_tr[[3, 0]])
-    #   area2 = 0.5*(A1*B1*(theta[1] - theta[0]) - abs(xint[0]*yint[1] - xint[1]*yint[0]));
-    #   area3 = 0.5*(A1*B1*(theta[3] - theta[2]) - abs(xint[2]*yint[3] - xint[3]*yint[2]));
-    #   area4 = 0.5*(A2*B2*(theta_tr[2] - theta_tr[1]) - abs(xint_tr[1]*yint_tr[2] - xint_tr[2]*yint_tr[1]));
-    #   area5 = 0.5*(A2*B2*(theta_tr[0] - theta_tr[3] + 2*np.pi) - abs(xint_tr[3]*yint_tr[0] - xint_tr[0]*yint_tr[3]));
-
-    else:
-        area2 = InFrameEllipseSegment(a, xint[[1, 2]], yint[[1, 2]], theta[[1, 2]])
-        area3 = InFrameEllipseSegment(a, xint[[3, 0]], yint[[3, 0]], theta[[3, 0]])
-        area4 = InFrameEllipseSegment(b, xint_tr[[0, 1]], yint_tr[[0, 1]], theta_tr[[0, 1]])
-        area5 = InFrameEllipseSegment(b, xint_tr[[2, 3]], yint_tr[[2, 3]], theta_tr[[2, 3]])
-
-    #   area2 = 0.5*(A1*B1*(theta[2] - theta[1]) - abs(xint[1]*yint[2] - xint[2]*yint[1]));
-    #   area3 = 0.5*(A1*B1*(theta[0] - theta[3] + 2*np.pi) - abs(xint[3]*yint[0] - xint[0]*yint[3]));
-    #   area4 = 0.5*(A2*B2*(theta[1] - theta[0]) - abs(xint_tr[0]*yint_tr[1] - xint_tr[1]*yint_tr[0]));
-    #   area5 = 0.5*(A2*B2*(theta[3] - theta[2]) - abs(xint_tr[2]*yint_tr[3] - xint_tr[3]*yint_tr[2]));
-
-    return area1 + area2 + area3 + area4 + area5
+# def fourPTarea(a, b, x, y):
+#     # returns the overlap area with 4 intersection points (Xint, Yint)
+#
+#     # input values (Xint, Yint) relative to one ellipse
+#
+#     A1, B1 = a[0], a[1]
+#     A2, B2 = b[0], b[1]
+#     phi1, phi2 = a[4], b[4]
+#     h1, k1, h2, k2 = a[2], a[3], b[2], b[3]
+#     v=[A2, B2, h2 - h1, k2 - k1, phi2 - phi1]
+#     AA, BB, CC, DD, EE, FF = Coeff(v)
+#
+#     xint = []
+#     yint = []
+#     xint_tr = []
+#     yint_tr = []
+#     theta = np.zeros(4)
+#     theta_tr = np.zeros(4)
+#
+#     for i in range(4):
+#         xa_t, ya_t = Translate(x[i], y[i], -h1, -k1)
+#         xint, yint = np.hstack((xint, Rotate(xa_t, ya_t, -phi1)[0])), np.hstack((yint, Rotate(xa_t, ya_t, -phi1)[1]))
+#         xb_t, yb_t = Translate(x[i], y[i], -h2, -k2)
+#         xint_tr, yint_tr = np.hstack((xint_tr, Rotate(xb_t, yb_t, -phi2)[0])), np.hstack(
+#             (yint_tr, Rotate(xb_t, yb_t, -phi2)[1]))
+#
+#     for i in range(4):
+#         if yint[i] < 0:
+#             theta[i] = 2 * np.pi - np.arccos(xint[i] / A1)
+#         else:
+#             theta[i] = np.arccos(xint[i] / A1)
+#
+#         if yint_tr[i] < 0:
+#             theta_tr[i] = 2 * np.pi - np.arccos(xint_tr[i] / A2)
+#         else:
+#             theta_tr[i] = np.arccos(xint_tr[i] / A2)
+#
+#     #   re-arranging in counter-clockewise order
+#
+#     for i in range(1, 4):
+#
+#         tmp00 = theta[i]
+#         tmp01 = theta_tr[i]
+#         tmp10 = xint[i]
+#         tmp11 = xint_tr[i]
+#         tmp20 = yint[i]
+#         tmp21 = yint_tr[i]
+#
+#         for k in range(i - 1, -1, -1):
+#
+#             if theta[k] > theta[k + 1]:
+#                 theta[k + 1] = theta[k]
+#                 theta_tr[k + 1] = theta_tr[k]
+#                 xint[k + 1] = xint[k]
+#                 xint_tr[k + 1] = xint_tr[k]
+#                 yint[k + 1] = yint[k]
+#                 yint_tr[k + 1] = yint_tr[k]
+#                 theta[k] = tmp00
+#                 theta_tr[k] = tmp01
+#                 xint[k] = tmp10
+#                 xint_tr[k] = tmp11
+#                 yint[k] = tmp20
+#                 yint_tr[k] = tmp21
+#
+#             else:
+#                 break
+#
+#     area1 = 0.5 * abs((xint[2] - xint[0]) * (yint[3] - yint[1]) - (xint[3] - xint[1]) * (yint[2] - yint[0]))
+#
+#     xmid = A1 * np.cos((theta[0] + theta[1]) / 2)
+#     ymid = B1 * np.sin((theta[0] + theta[1]) / 2)
+#
+#     if AA * xmid ** 2 + BB * xmid * ymid + CC * ymid ** 2 + DD * xmid + EE * ymid + FF < 0:
+#         area2 = InFrameEllipseSegment(a, xint[[0, 1]], yint[[0, 1]], theta[[0, 1]])
+#         area3 = InFrameEllipseSegment(a, xint[[2, 3]], yint[[2, 3]], theta[[2, 3]])
+#         area4 = InFrameEllipseSegment(b, xint_tr[[1, 2]], yint_tr[[1, 2]], theta_tr[[1, 2]])
+#         area5 = InFrameEllipseSegment(b, xint_tr[[3, 0]], yint_tr[[3, 0]], theta_tr[[3, 0]])
+#     #   area2 = 0.5*(A1*B1*(theta[1] - theta[0]) - abs(xint[0]*yint[1] - xint[1]*yint[0]));
+#     #   area3 = 0.5*(A1*B1*(theta[3] - theta[2]) - abs(xint[2]*yint[3] - xint[3]*yint[2]));
+#     #   area4 = 0.5*(A2*B2*(theta_tr[2] - theta_tr[1]) - abs(xint_tr[1]*yint_tr[2] - xint_tr[2]*yint_tr[1]));
+#     #   area5 = 0.5*(A2*B2*(theta_tr[0] - theta_tr[3] + 2*np.pi) - abs(xint_tr[3]*yint_tr[0] - xint_tr[0]*yint_tr[3]));
+#
+#     else:
+#         area2 = InFrameEllipseSegment(a, xint[[1, 2]], yint[[1, 2]], theta[[1, 2]])
+#         area3 = InFrameEllipseSegment(a, xint[[3, 0]], yint[[3, 0]], theta[[3, 0]])
+#         area4 = InFrameEllipseSegment(b, xint_tr[[0, 1]], yint_tr[[0, 1]], theta_tr[[0, 1]])
+#         area5 = InFrameEllipseSegment(b, xint_tr[[2, 3]], yint_tr[[2, 3]], theta_tr[[2, 3]])
+#
+#     #   area2 = 0.5*(A1*B1*(theta[2] - theta[1]) - abs(xint[1]*yint[2] - xint[2]*yint[1]));
+#     #   area3 = 0.5*(A1*B1*(theta[0] - theta[3] + 2*np.pi) - abs(xint[3]*yint[0] - xint[0]*yint[3]));
+#     #   area4 = 0.5*(A2*B2*(theta[1] - theta[0]) - abs(xint_tr[0]*yint_tr[1] - xint_tr[1]*yint_tr[0]));
+#     #   area5 = 0.5*(A2*B2*(theta[3] - theta[2]) - abs(xint_tr[2]*yint_tr[3] - xint_tr[3]*yint_tr[2]));
+#
+#     return area1 + area2 + area3 + area4 + area5
 
 
 def BackgroundLattice(x, L, minorAxis):
@@ -432,8 +444,7 @@ def Intersections(x, majorAxis, minorAxis, L):
 
     # set up coarse-grained background lattice (as a flattened array)
     BG = BackgroundLattice(x, L, minorAxis)
-    
-    
+
     # pad the lattice array with extra empty rows and columns for grid searching
     BG[(N + 1) ** 2:(N + 1) ** 2] = [[] for i in range(r * (N + 2 * r + 1))]
     for i in range(N, -1, -1):
@@ -503,11 +514,13 @@ def Reproduce(x, attachments, tau, dt=1):
         k = random.uniform()
         if k < 0.5:
 
-            xmid, ymid = Rotate(x[t][0, reproducingCells[i]] * np.cos(phis[i]), x[t][1, reproducingCells[i]] * np.sin(phis[i]), x[t][4, reproducingCells[i]])
+            xmid, ymid = Rotate(x[t][0, reproducingCells[i]] * np.cos(phis[i]),
+                                x[t][1, reproducingCells[i]] * np.sin(phis[i]), x[t][4, reproducingCells[i]])
             xmid += x[t][2, reproducingCells[i]]
             ymid += x[t][3, reproducingCells[i]]
 
-            theta = x[t][4, reproducingCells[i]] + np.arctan(x[t][0, reproducingCells[i]] / x[t][1, reproducingCells[i]] * np.tan(phis[i]))
+            theta = x[t][4, reproducingCells[i]] + np.arctan(
+                x[t][0, reproducingCells[i]] / x[t][1, reproducingCells[i]] * np.tan(phis[i]))
 
             a0 = x[t][0, reproducingCells[i]] / 5
             b0 = x[t][1, reproducingCells[i]] / 5
@@ -515,16 +528,18 @@ def Reproduce(x, attachments, tau, dt=1):
             ycen = ymid + b0 * np.sin(theta)
 
         else:
-            xmid, ymid = Rotate(-x[t][0, reproducingCells[i]] * np.cos(phis[i]), -x[t][1, reproducingCells[i]] * np.sin(phis[i]), x[t][4, reproducingCells[i]])
+            xmid, ymid = Rotate(-x[t][0, reproducingCells[i]] * np.cos(phis[i]),
+                                -x[t][1, reproducingCells[i]] * np.sin(phis[i]), x[t][4, reproducingCells[i]])
             xmid += x[t][2, reproducingCells[i]]
             ymid += x[t][3, reproducingCells[i]]
-            theta = x[t][4, reproducingCells[i]] + np.arctan(x[t][0, reproducingCells[i]] / x[t][1, reproducingCells[i]] * np.tan(phis[i]))
+            theta = x[t][4, reproducingCells[i]] + np.arctan(
+                x[t][0, reproducingCells[i]] / x[t][1, reproducingCells[i]] * np.tan(phis[i]))
             a0 = x[t][0, reproducingCells[i]] / 5
             b0 = x[t][1, reproducingCells[i]] / 5
             xcen = xmid - a0 * np.cos(theta)
             ycen = ymid - b0 * np.sin(theta)
 
-        x[t] = np.hstack((x[t], [[a0], [b0], [xcen], [ycen], [theta], [0]]))
+        x[t] = np.hstack((x[t], [[a0], [b0], [xcen], [ycen], [theta], [0], [0]]))
         x[t][5, reproducingCells[i]] += 1
 
     return x, attachments
