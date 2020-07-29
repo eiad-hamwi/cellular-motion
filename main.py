@@ -214,3 +214,7 @@ def PlootCells(x, size):  # ellipse plotting module for cells (not final)
     ax.set_ylim(-size, size)
 
     return np.size(ells)
+
+
+x = GenerateCells(125, 0.5, 0.25, 10)
+fresh_attempt.PlotCells(x[0], 10)
