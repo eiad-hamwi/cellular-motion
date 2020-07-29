@@ -83,7 +83,7 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
     # loop over cells adult cells
     for i in range(N0):
 
-        x[t + 1][6, i] -= dt
+#        x[t + 1][6, i] -= dt
 
         for j in S[i]:
             Xint, Yint = fresh_attempt.InterPoints(x[t + 1][:, i], x[t + 1][:, j], eps)
@@ -94,7 +94,7 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
             delY = y1 - y2
             dist = np.sqrt(delX ** 2 + delY ** 2)
 
-            if np.size(Xint) != np.size(Yint):
+            if np.size(Xint) != np.size(Yint) or n == 4:
                 area = fresh_attempt.ShapelyArea(x[t + 1][:, i], x[t + 1][:, j])
                 forceX = area * (x1 - x2)/np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
                 forceY = area * (y1 - y2) / np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
@@ -109,44 +109,29 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
                     m = (Xint[0] - Xint[1]) / (Yint[1] - Yint[0])
                     a = np.cos(np.arctan(m))
                     b = np.sin(np.arctan(m))
-
-                    if dist >= (x[t + 1][1, i] + x[t + 1][1, j]):
-                        if a * radialX + b * radialY < 0:
-                            sgn = 1
-                        else:
-                            sgn = -1
-                    else:
-                        if a * radialX + b * radialY > 0:
-                            sgn = 1
-                        else:
-                            sgn = -1
-
                 else:
-                    m = (Xint[1] - Xint[0]) / (Yint[0] - Yint[1])
-                    a = np.cos(np.arctan(m))
-                    b = np.sin(np.arctan(m))
+                    m = (Yint[0] - Yint[1]) / (Xint[1] - Xint[0])
+                    a = np.sin(np.arctan(m))
+                    b = np.cos(np.arctan(m))
 
-                    if dist > (x[t + 1][1, i] + x[t + 1][1, j]):
-                        if a * radialX + b * radialY < 0:
-                            sgn = 1
-                        else:
-                            sgn = -1
+                if a * radialX + b * radialY < 0:
+                    sgn = 1
+                else:
+                    sgn = -1
 
-                    else:
-                        if a * radialX + b * radialY > 0:
-                            sgn = 1
-                        else:
-                            sgn = -1
+
+                # if dist > (x[t + 1][1, i] + x[t + 1][1, j]):
+
+                # else:
+                #     if a * radialX + b * radialY > 0:
+                #         sgn = 1
+                #     else:
+                #         sgn = -1
 
                 forceX = sgn * a * area
                 forceY = sgn * b * area
                 torque = radialX * forceY - radialY * forceX
 
-            elif n == 4:
-                print('4pt intersection ({0}, {1})'.format(i, j))
-                forceX = 0
-                forceY = 0
-                torque = 0
 
             elif dist < (x[t + 1][1, i] + x[t + 1][1, j]):
                 area = np.pi * min(x[t + 1][0, i] * x[t + 1][1, i], x[t + 1][0, j] * x[t + 1][1, j])
@@ -168,9 +153,9 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
             x[t + 1][4, j] -= 4 * mu * torque * dt / (A2 ** 2 + B2 ** 2)
 
 
-        if x[t + 1][5, i] > 0:
+#        if x[t + 1][5, i] > 0:
             
-            x[t + 1][6, i] -= dt
+#            x[t + 1][6, i] -= dt
 
         # growing the daughter cells in the G2 growth phase
         # (elongationRate) variable depends on the local concentration of nutrients
@@ -215,6 +200,3 @@ def PlootCells(x, size):  # ellipse plotting module for cells (not final)
 
     return np.size(ells)
 
-
-x = GenerateCells(125, 0.5, 0.25, 10)
-fresh_attempt.PlotCells(x[0], 10)

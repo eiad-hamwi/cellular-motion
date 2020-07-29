@@ -244,11 +244,7 @@ def twoPTarea(a, b, X, Y):
     return area1 + area2
 
 
-def create_ellipse(v):
-
-    center = (v[2], v[3])
-    lengths = (v[0], v[1])
-    angle = v[4] * 180 / np.pi
+def create_ellipse(center, lengths, angle=0):
 
     circ = Point(center).buffer(1)
     ell = affinity.scale(circ, int(lengths[0]), int(lengths[1]))
@@ -259,8 +255,8 @@ def create_ellipse(v):
 
 def ShapelyArea(a, b):
 
-    ellipse1 = create_ellipse(a)
-    ellipse2 = create_ellipse(b)
+    ellipse1 = create_ellipse((a[0],a[1]),(a[2],a[3]),a[4]*180/np.pi)
+    ellipse2 = create_ellipse((b[0],b[1]),(b[2],b[3]),b[4]*180/np.pi)
     intersect = ellipse1.intersection(ellipse2)
 
     return intersect.area
@@ -484,7 +480,9 @@ def Intersections(x, majorAxis, minorAxis, L):
                     continue
                 elif dist < x[1, i] + x[1, j]:
                     intersectingCells[i].append(j)
-                elif np.size(InterPoints(x[:, i], x[:, j])) > 0:
+                else:
+                    X, Y = InterPoints(x[:, i], x[:, j])
+                    if np.size(X)>0 and                     
                     intersectingCells[i].append(j)
                 else:
                     continue
