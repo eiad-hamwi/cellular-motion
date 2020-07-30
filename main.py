@@ -71,6 +71,19 @@ def GenerateCells(N, majorAxis, minorAxis, L, resolution=5):
     return x
 
 
+def GenerateCellsNonRandom(majorAxis, minorAxis, L, resolution=5):
+    #   Generates a (7 x N) array of cell configurations [majorAxis, minorAxis, 2D-positions (x, y), orientations (phi)
+    #   in [-Pi,Pi), Reproduction Number, and time-to-budding] of all the N cells
+    pi = np.pi
+
+    Cells = np.vstack((majorAxis, minorAxis, L/3.0+majorAxis, L * 0.5, pi , 1, 40 * random.rand()))
+
+    Cells = np.hstack((Cells, np.vstack((majorAxis, minorAxis, 2.0/3.0*L-majorAxis, L * 0.5, pi , 1, 40 * random.rand()))))
+
+    x = [Cells]
+
+    return x
+
 def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, tau=10, elongationRate=0.02, sigma=1,
                         mu=0.5):
     eps = 1e-5
@@ -183,7 +196,7 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
 def add_ellipse(x, majorAxis, minorAxis, X, Y, theta):
     return np.hstack((x, np.vstack((majorAxis, minorAxis, X, Y, theta, 1))))
 
-
+# IS THIS THE SAME AS THE ONE IN FRESH_ATTEMPT?
 def PlootCells(x, size):  # ellipse plotting module for cells (not final)
 
     ells = [Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i]) for i in
@@ -199,4 +212,6 @@ def PlootCells(x, size):  # ellipse plotting module for cells (not final)
     ax.set_ylim(-size, size)
 
     return np.size(ells)
+
+
 

@@ -1,0 +1,9 @@
+Maxis=1
+maxis=0.5
+L=5
+x=GenerateCellsNonRandom(Maxis,maxis,L)
+# Try changing the number of steps from 100 to 1000: it seems to me that cells don't move after 100 steps or so,
+# given that the shadows become solid orange and solid red
+while len(x)<=100:
+    x = dynamic_update_step(x, [], 0.01, Maxis, maxis, L, False)
+fresh_attempt.PlotTemporalCells(x,L)

@@ -9,7 +9,8 @@ from matplotlib.patches import Polygon
 
 def PlotCells(x, size):  # ellipse plotting module for cells (not final)
 
-    ells = [Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i]) for i in
+    # AG: REMOVED FACE COLOR, ADDED EDGE COLOR
+    ells = [Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i],fc="none",ec="blue") for i in
             range(np.size(x, axis=1))]
 
     fig = plt.figure(0)
@@ -20,6 +21,32 @@ def PlotCells(x, size):  # ellipse plotting module for cells (not final)
 
     ax.set_xlim(0, size)
     ax.set_ylim(0, size)
+
+    # AG: ADDED PLT.SHOW()
+    plt.show()
+
+    return np.size(ells)
+
+
+def PlotTemporalCells(y, size):  # ellipse plotting module for cells (not final)
+
+    fig = plt.figure(0)
+    ax = fig.add_subplot(111, aspect='equal')
+
+    for t in range(0,len(y)):
+        x=y[t]
+        # AG: REMOVED FACE COLOR, ADDED EDGE COLOR, goes from red to blue for the first cell as time goes by, from orange to blue for the other one
+        ells = [Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i],fc="none",ec= (1.0-1.0*float(t)/len(y),i/2.0,1.0*float(t)/len(y)) ) for i in
+                range(np.size(x, axis=1))]
+
+        for e in ells:
+            ax.add_artist(e)
+
+        ax.set_xlim(0, size)
+        ax.set_ylim(0, size)
+
+    # AG: ADDED PLT.SHOW()
+    plt.show()
 
     return np.size(ells)
 
@@ -482,10 +509,10 @@ def Intersections(x, majorAxis, minorAxis, L):
                     intersectingCells[i].append(j)
                 else:
                     X, Y = InterPoints(x[:, i], x[:, j])
-                    if np.size(X)>0 and                     
-                    intersectingCells[i].append(j)
-                else:
-                    continue
+                    if np.size(X)>0 and np.size(X)!=np.size(Y):
+                        intersectingCells[i].append(j)
+                    else:
+                        continue
 
     return intersectingCells
 
