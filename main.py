@@ -96,6 +96,7 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
     # loop over cells adult cells
     for i in range(N0):
 
+        print(S) # print S to figure out what's going on
 #        x[t + 1][6, i] -= dt
 
         for j in S[i]:
@@ -165,6 +166,12 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
             x[t + 1][3, j] -= mu * forceY * dt * majorAxis * minorAxis / A2 / B2
             x[t + 1][4, j] -= 4 * mu * torque * dt / (A2 ** 2 + B2 ** 2)
 
+            # print variables to figure out what's going on
+            print('Time ')
+            print(t)
+            print(i)
+            print(forceX)
+            print(forceY)
 
 #        if x[t + 1][5, i] > 0:
             
