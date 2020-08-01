@@ -461,7 +461,7 @@ def BackgroundLattice(x, L, minorAxis):
 
 def Intersections(x, majorAxis, minorAxis, L):
     N = np.int(np.ceil(L / minorAxis))
-    r = int(np.ceil(majorAxis / minorAxis))
+    r = int(np.ceil(majorAxis / minorAxis)) + 1
 
     intersectingCells = [[] for k in range(np.size(x, axis=1))]
 
@@ -509,7 +509,7 @@ def Intersections(x, majorAxis, minorAxis, L):
                     intersectingCells[i].append(j)
                 else:
                     X, Y = InterPoints(x[:, i], x[:, j])
-                    if np.size(X)>0 and np.size(X)!=np.size(Y):
+                    if np.size(X)>0 and np.size(X)==np.size(Y):
                         intersectingCells[i].append(j)
                     else:
                         continue
