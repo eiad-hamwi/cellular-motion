@@ -1,16 +1,15 @@
 import numpy as np
 from numpy import random
+import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
-from matplotlib import pyplot as plt
 from shapely.geometry import Point
 from shapely import affinity
-from matplotlib.patches import Polygon
 
 
 def PlotCells(x, size):  # ellipse plotting module for cells (not final)
 
     # AG: REMOVED FACE COLOR, ADDED EDGE COLOR
-    ells = [Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i],fc="none",ec="blue") for i in
+    ells = [Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i], fc="none", ec="blue") for i in
             range(np.size(x, axis=1))]
 
     fig = plt.figure(0)
@@ -32,12 +31,15 @@ def PlotTemporalCells(y, size):  # ellipse plotting module for cells (not final)
 
     fig = plt.figure(0)
     ax = fig.add_subplot(111, aspect='equal')
+    ells = []
+    for t in range(0, len(y)):
+        x = y[t]
+        # AG: REMOVED FACE COLOR, ADDED EDGE COLOR, goes from red to blue for the first cell as time goes by,
+        # from orange to blue for the other one
 
-    for t in range(0,len(y)):
-        x=y[t]
-        # AG: REMOVED FACE COLOR, ADDED EDGE COLOR, goes from red to blue for the first cell as time goes by, from orange to blue for the other one
-        ells = [Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i],fc="none",ec= (1.0-1.0*float(t)/len(y),i/2.0,1.0*float(t)/len(y)) ) for i in
-                range(np.size(x, axis=1))]
+        for i in range(np.size(x, axis=1)):
+            ells.append(Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i], fc="none",
+                                ec=(1.0 - 1.0 * float(t) / len(y), i / 2.0, 1.0 * float(t) / len(y))))
 
         for e in ells:
             ax.add_artist(e)
@@ -99,9 +101,9 @@ def Coeff(v):
     BB = 2 * sinphi * cosphi / majorAxis ** 2 - 2 * sinphi * cosphi / minorAxis ** 2
     CC = (sinphi / majorAxis) ** 2 + (cosphi / minorAxis) ** 2
     DD = -2 * cosphi * (cosphi * h + sinphi * k) / majorAxis ** 2 + 2 * sinphi * (
-                -sinphi * h + cosphi * k) / minorAxis ** 2
+            -sinphi * h + cosphi * k) / minorAxis ** 2
     EE = -2 * sinphi * (cosphi * h + sinphi * k) / majorAxis ** 2 + 2 * cosphi * (
-                sinphi * h - cosphi * k) / minorAxis ** 2
+            sinphi * h - cosphi * k) / minorAxis ** 2
     FF = ((cosphi * h + sinphi * k) / majorAxis) ** 2 + ((sinphi * h - cosphi * k) / minorAxis) ** 2 - 1
 
     return AA, BB, CC, DD, EE, FF
@@ -179,7 +181,7 @@ def InterPoints(a, b, eps=1e-5):
 
     X = X1[(np.abs(X2[:, None] - X1) < eps).any(0)]
 
-    #if np.size(X) != np.size(Y):
+    # if np.size(X) != np.size(Y):
     #    print(np.array([[X1, X2], [X, Y]]))
 
     return X, Y
@@ -272,7 +274,6 @@ def twoPTarea(a, b, X, Y):
 
 
 def create_ellipse(center, lengths, angle=0):
-
     circ = Point(center).buffer(1)
     ell = affinity.scale(circ, int(lengths[0]), int(lengths[1]))
     ellr = affinity.rotate(ell, angle)
@@ -281,9 +282,8 @@ def create_ellipse(center, lengths, angle=0):
 
 
 def ShapelyArea(a, b):
-
-    ellipse1 = create_ellipse((a[0],a[1]),(a[2],a[3]),a[4]*180/np.pi)
-    ellipse2 = create_ellipse((b[0],b[1]),(b[2],b[3]),b[4]*180/np.pi)
+    ellipse1 = create_ellipse((a[0], a[1]), (a[2], a[3]), a[4] * 180 / np.pi)
+    ellipse2 = create_ellipse((b[0], b[1]), (b[2], b[3]), b[4] * 180 / np.pi)
     intersect = ellipse1.intersection(ellipse2)
 
     return intersect.area
@@ -509,7 +509,7 @@ def Intersections(x, majorAxis, minorAxis, L):
                     intersectingCells[i].append(j)
                 else:
                     X, Y = InterPoints(x[:, i], x[:, j])
-                    if np.size(X)>0 and np.size(X)==np.size(Y):
+                    if np.size(X) > 0 and np.size(X) == np.size(Y):
                         intersectingCells[i].append(j)
                     else:
                         continue

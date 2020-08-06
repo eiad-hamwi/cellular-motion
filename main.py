@@ -84,6 +84,7 @@ def GenerateCellsNonRandom(majorAxis, minorAxis, L, resolution=5):
 
     return x
 
+
 def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, tau=10, elongationRate=0.02, sigma=1,
                         mu=0.5):
     eps = 1e-5
@@ -96,7 +97,7 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
     # loop over cells adult cells
     for i in range(N0):
 
-        print(S) # print S to figure out what's going on
+#        print(S) # print S to figure out what's going on
 #        x[t + 1][6, i] -= dt
 
         for j in S[i]:
@@ -167,14 +168,14 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
             x[t + 1][4, j] -= 4 * mu * torque * dt / (A2 ** 2 + B2 ** 2)
 
             # print variables to figure out what's going on
-            print('Time ')
-            print(t)
-            print(i)
-            print(forceX)
-            print(forceY)
+#            print('Time ')
+#            print(t)
+#            print(i)
+#            print(forceX)
+#            print(forceY)
 
 #        if x[t + 1][5, i] > 0:
-            
+
 #            x[t + 1][6, i] -= dt
 
         # growing the daughter cells in the G2 growth phase
@@ -202,6 +203,7 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
 
 def add_ellipse(x, majorAxis, minorAxis, X, Y, theta):
     return np.hstack((x, np.vstack((majorAxis, minorAxis, X, Y, theta, 1))))
+
 
 # IS THIS THE SAME AS THE ONE IN FRESH_ATTEMPT?
 def PlootCells(x, size):  # ellipse plotting module for cells (not final)
