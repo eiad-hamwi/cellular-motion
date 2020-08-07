@@ -76,9 +76,9 @@ def GenerateCellsNonRandom(majorAxis, minorAxis, L, resolution=5):
     #   in [-Pi,Pi), Reproduction Number, and time-to-budding] of all the N cells
     pi = np.pi
 
-    Cells = np.vstack((majorAxis, minorAxis, L/3.0+majorAxis, L * 0.5, pi , 1, 40 * random.rand()))
+    Cells = np.vstack((majorAxis, minorAxis, L*0.5, L*0.5, pi , 1, 40*random.rand()))
 
-    Cells = np.hstack((Cells, np.vstack((majorAxis, minorAxis, 2.0/3.0*L-majorAxis, L * 0.5, pi , 1, 40 * random.rand()))))
+    Cells = np.hstack((Cells, np.vstack((majorAxis, minorAxis, 0.5*L + 5/3*majorAxis, L*0.5, pi , 1, 40*random.rand()))))
 
     x = [Cells]
 
@@ -224,3 +224,8 @@ def PlootCells(x, size):  # ellipse plotting module for cells (not final)
 
 
 
+x = GenerateCellsNonRandom(1, 0.5, 10)
+fresh_attempt.PlotCells(x, 0, 10)
+while len(x)<200:
+    x = dynamic_update_step(x, [], 0.02, 1.0, 0.5, 10, False)
+fresh_attempt.PlotCells(x, 0, 10)

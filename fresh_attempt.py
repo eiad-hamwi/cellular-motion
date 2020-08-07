@@ -1,30 +1,64 @@
+import os
+import imageio
 import numpy as np
-from numpy import random
 import matplotlib.pyplot as plt
+from numpy import random
 from matplotlib.patches import Ellipse
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from shapely.geometry import Point
 from shapely import affinity
 
 
-def PlotCells(x, size):  # ellipse plotting module for cells (not final)
-
-    # AG: REMOVED FACE COLOR, ADDED EDGE COLOR
-    ells = [Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i], fc="none", ec="blue") for i in
-            range(np.size(x, axis=1))]
+def PlotCells(x, i, size):  # ellipse plotting module for cells (not final)
 
     fig = plt.figure(0)
-
     ax = fig.add_subplot(111, aspect='equal')
-    for e in ells:
-        ax.add_artist(e)
 
     ax.set_xlim(0, size)
     ax.set_ylim(0, size)
 
-    # AG: ADDED PLT.SHOW()
+    for j in range(np.size(x[i], axis=1)):
+        ax.add_artist(
+            Ellipse((x[i][2, j], x[i][3, j]), 2 * x[i][0, j], 2 * x[i][1, j], 180 / np.pi * x[i][4, j], fc="none",
+                    ec="blue"))
+
     plt.show()
 
-    return np.size(ells)
+    return np.size(x[i], axis=1)
+
+
+#   this initializes the Figure, Canvas, & Axes for the animation
+def anim_init(size):
+    fig = Figure()
+    canvas = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
+    ax.set_xlim(0, size)
+    ax.set_ylim(0, size)
+    ax.set_aspect(1)
+
+    return fig, canvas, ax
+
+
+#   this adds the ellipses (cells) to the axes and returns the filled axes
+def ells(x, i, ax):
+    for j in range(np.size(x[i], axis=1)):
+        ax.add_artist(
+            Ellipse((x[i][2, j], x[i][3, j]), 2 * x[i][0, j], 2 * x[i][1, j], 180 / np.pi * x[i][4, j], fc="none",
+                    ec="blue"))
+    return ax
+
+
+#   this generates all the image files, writes the GIF animation, then deletes the image file
+def animate(x, size, filename):
+    image_list = []
+    for i in range(len(x)):
+        fig, canvas, ax = anim_init(size)                       # initialize Figure
+        ax = ells(x, i, ax)                                     # add ellipses
+        fig.savefig('plots/test.png')                           # save plot to temporary image file
+        image_list.append(imageio.imread('plots/test.png'))     # transform image file into NumPy array
+    os.remove('plots/test.png')                                 # delete the image file
+    imageio.mimwrite('plots/{}.gif'.format(str(filename)), image_list)             # compile image_list into GIF
 
 
 def PlotTemporalCells(y, size):  # ellipse plotting module for cells (not final)
