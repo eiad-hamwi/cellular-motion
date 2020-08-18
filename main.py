@@ -1,24 +1,40 @@
 import numpy as np
 from numpy import random
-from matplotlib.patches import Ellipse
 import matplotlib.pyplot as plt
 
 import fresh_attempt
 
 
-def GenerateCells(N, majorAxis, minorAxis, L, resolution=5):
-    #   Generates a (7 x N) array of cell configurations [majorAxis, minorAxis, 2D-positions (x, y), orientations (phi) 
-    #   in [-Pi,Pi), Reproduction Number, and time-to-budding] of all the N cells
+def GenerateCells(N, radius, length, L, resolution=5):
+    #   Generates a (10 x N) array of cell configurations 
+    #   [radius, length, 2D positions and orientiation (x, y, phi), 
+    #   2D linear and angular velocities (vx, vy, omega), 
+    #   Reproduction Number, and time-to-budding] for each of the N cells
     pi = np.pi
 
-    Cells = np.vstack((majorAxis, minorAxis, L * random.rand(), L * random.rand(), pi * (random.rand() - 1 / 2), 1, 40 * random.rand()))
-
-    # find minimum distance between new cell 'testCell' and other cells 'Cells
-    def mindist(testCell, Cells):
-        return min(np.sqrt((Cells[2, :] - testCell[2, 0]) ** 2 + (Cells[3, :] - testCell[3, 0]) ** 2))
+    Cells = np.vstack((radius, 
+                       length, 
+                       L * random.rand(), L * random.rand(), 
+                       pi * (random.rand() - 1 / 2), 0, 0, 0, 
+                       1, 
+                       40 * random.rand()
+                       ))
+    
+    for i in range(1,N):
+        Cells = np.hstack((Cells, 
+                           np.vstack((radius, 
+                                      length, 
+                                      L * random.rand(), L * random.rand(), 
+                                      pi * (random.rand() - 1 / 2), 0, 0, 0, 
+                                      1, 
+                                      40 * random.rand()
+                                      ))
+                           ))
 
     n = 1
+    """
     while n < N:
+    
 
         testCell = np.vstack(
             (majorAxis, minorAxis, L * random.rand(), L * random.rand(), pi * (random.rand() - 1 / 2), 1, 40 * random.rand()))
@@ -65,6 +81,7 @@ def GenerateCells(N, majorAxis, minorAxis, L, resolution=5):
         else:
             Cells = np.hstack((Cells, testCell))
             n += 1
+    """
 
     x = [Cells]
 
@@ -85,14 +102,14 @@ def GenerateCellsNonRandom(majorAxis, minorAxis, L, resolution=5):
     return x
 
 
-def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, tau=10, elongationRate=0.02, sigma=1,
+def dynamic_update_step(x, attachments, dt, radius, length, L, rep=True, tau=10, elongationRate=0.02, sigma=1,
                         mu=0.5):
-    eps = 1e-5
+    eps = 3e-5
     t = len(x) - 1
     N0 = np.size(x[t], axis=1)
 
     x.append(x[t].copy())
-    S = fresh_attempt.Intersections(x[t], majorAxis, minorAxis, L)
+    S, d, a = fresh_attempt.Intersections(x[t], length, radius, L)
 
     # loop over cells adult cells
     for i in range(N0):
@@ -101,71 +118,41 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
 #        x[t + 1][6, i] -= dt
 
         for j in S[i]:
-            Xint, Yint = fresh_attempt.InterPoints(x[t + 1][:, i], x[t + 1][:, j], eps)
-            n = np.size(Xint)
-            A1, B1, x1, y1 = x[t + 1][0:4, i]
-            A2, B2, x2, y2 = x[t + 1][0:4, j]
-            delX = x1 - x2
-            delY = y1 - y2
-            dist = np.sqrt(delX ** 2 + delY ** 2)
-
-            if np.size(Xint) != np.size(Yint) or n == 4:
-                area = fresh_attempt.ShapelyArea(x[t + 1][:, i], x[t + 1][:, j])
-                forceX = area * (x1 - x2)/np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-                forceY = area * (y1 - y2) / np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-                torque = 0
-
-            elif n == 2:
-                area = fresh_attempt.twoPTarea(x[t + 1][:, i], x[t + 1][:, j], Xint, Yint)
-                radialX = np.average(Xint) - x1
-                radialY = np.average(Yint) - y1
-
-                if abs(Yint[1] - Yint[0]) > eps:
-                    m = (Xint[0] - Xint[1]) / (Yint[1] - Yint[0])
-                    a = np.cos(np.arctan(m))
-                    b = np.sin(np.arctan(m))
-                else:
-                    m = (Yint[0] - Yint[1]) / (Xint[1] - Xint[0])
-                    a = np.sin(np.arctan(m))
-                    b = np.cos(np.arctan(m))
-
-                if a * radialX + b * radialY < 0:
-                    sgn = 1
-                else:
-                    sgn = -1
-
-
-                # if dist > (x[t + 1][1, i] + x[t + 1][1, j]):
-
-                # else:
-                #     if a * radialX + b * radialY > 0:
-                #         sgn = 1
-                #     else:
-                #         sgn = -1
-
-                forceX = sgn * a * area
-                forceY = sgn * b * area
-                torque = radialX * forceY - radialY * forceX
-
-
-            elif dist < (x[t + 1][1, i] + x[t + 1][1, j]):
-                area = np.pi * min(x[t + 1][0, i] * x[t + 1][1, i], x[t + 1][0, j] * x[t + 1][1, j])
-                forceX = area * delX / dist
-                forceY = area * delY / dist
-                torque = 0
-
+            
+            
+            r1, l1, x1, y1, theta1, vx1, vy1, omega1 = x[t][:8, i]
+            r2, l2, x2, y2, theta2, vx2, vy2, omega2 = x[t][:8, j]
+            
+            ncc = (a[i, j, 0, :] - a[i, j, 1, :]) / d[i, j]
+            rcc = (a[i, j, 0, :] + a[i, j, 1, :]) / 2
+            dcc = r1 + r2 - d[i, j]
+            rprime1 = np.hstack((rcc - np.array([x1, y1]), 0))
+            rprime2 = np.hstack((rcc - np.array([x2, y2]), 0))
+            vcc = x[5:7, i] - x[5:7, j] + np.cross(np.array([0, 0, omega1]), 
+                                                  rprime1)[:2] - np.cross(
+                                                      np.array([0, 0, omega2]),
+                                                      rprime2)[:2]
+            tanComp = np.linalg.norm(vcc - np.dot(vcc, ncc) * ncc)
+            if tanComp < 1e-5:
+                tcc = np.roll(ncc, 1)
+                tcc[0] *= -1
             else:
-                forceX = 0
-                forceY = 0
-                torque = 0
+                tcc = (vcc - np.dot(vcc, ncc) * ncc) / tanComp
+                
+            Vi = np.pi * r1 ** 2 + 2 * r1 * l1
+            Vj = np.pi * r2 ** 2 + 2 * r2 * l2
+            M = Vi * Vj / (Vi + Vj)
+    
 
-            x[t + 1][2, i] += mu * forceX * dt * majorAxis * minorAxis / A1 / B1
-            x[t + 1][3, i] += mu * forceY * dt * majorAxis * minorAxis / A1 / B1
-            x[t + 1][4, i] += 4 * mu * torque * dt / (A1 ** 2 + B1 ** 2)
+            
 
-            x[t + 1][2, j] -= mu * forceX * dt * majorAxis * minorAxis / A2 / B2
-            x[t + 1][3, j] -= mu * forceY * dt * majorAxis * minorAxis / A2 / B2
-            x[t + 1][4, j] -= 4 * mu * torque * dt / (A2 ** 2 + B2 ** 2)
+            x[t + 1][2, i] += mu * (vx1 + forceX * dt / 2) * dt
+            x[t + 1][3, i] += mu * (vx2 + forceY * dt / 2) * dt
+            x[t + 1][4, i] += 4 * mu * torque * dt / 
+
+            x[t + 1][5, j] -= mu * forceX * dt / A2 / B2
+            x[t + 1][6, j] -= mu * forceY * dt / A2 / B2
+            x[t + 1][7, j] -= 4 * mu * torque * dt / (A2 ** 2 + B2 ** 2)
 
             # print variables to figure out what's going on
 #            print('Time ')
@@ -203,29 +190,3 @@ def dynamic_update_step(x, attachments, dt, majorAxis, minorAxis, L, rep=True, t
 
 def add_ellipse(x, majorAxis, minorAxis, X, Y, theta):
     return np.hstack((x, np.vstack((majorAxis, minorAxis, X, Y, theta, 1))))
-
-
-# IS THIS THE SAME AS THE ONE IN FRESH_ATTEMPT?
-def PlootCells(x, size):  # ellipse plotting module for cells (not final)
-
-    ells = [Ellipse((x[2, i], x[3, i]), 2 * x[0, i], 2 * x[1, i], 180 / np.pi * x[4, i]) for i in
-            range(np.size(x, axis=1))]
-
-    fig = plt.figure(0)
-
-    ax = fig.add_subplot(111, aspect='equal')
-    for e in ells:
-        ax.add_artist(e)
-
-    ax.set_xlim(-size, size)
-    ax.set_ylim(-size, size)
-
-    return np.size(ells)
-
-
-
-x = GenerateCellsNonRandom(1, 0.5, 10)
-fresh_attempt.PlotCells(x, 0, 10)
-while len(x)<200:
-    x = dynamic_update_step(x, [], 0.02, 1.0, 0.5, 10, False)
-fresh_attempt.PlotCells(x, 0, 10)
