@@ -3,6 +3,7 @@ import imageio
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy import random
+from matplotlib.patches import Ellipse
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
@@ -17,7 +18,8 @@ def PlotCells(x, i, size):  # ellipse plotting module for cells (not final)
 
     for j in range(np.size(x[i], axis=1)):
         ax.add_artist(
-            Ellipse((x[i][2, j], x[i][3, j]), 2 * x[i][0, j], 2 * x[i][1, j], 180 / np.pi * x[i][4, j], fc="none",
+            Ellipse((x[i][2, j], x[i][3, j]), 2 * x[i][0, j] + x[i][1, j], 
+                    2 * x[i][0, j], 180 / np.pi * x[i][4, j], fc="none",
                     ec="blue"))
 
     plt.show()
@@ -40,7 +42,8 @@ def PlotFewCells(x, t, J):  # ellipse plotting module for cells (not final)
 
     for j in J:
         ax.add_artist(
-            Ellipse((x[t][2, j], x[t][3, j]), 2 * x[t][0, j], 2 * x[t][1, j], 180 / np.pi * x[t][4, j], fc="none",
+            Ellipse((x[t][2, j], x[t][3, j]), 2 * x[i][0, j] + x[i][1, j], 
+                    2 * x[i][0, j], 180 / np.pi * x[t][4, j], fc="none",
                     ec="blue"))
     
     return plt.show()
@@ -62,7 +65,8 @@ def anim_init(size):
 def ells(x, i, ax):
     for j in range(np.size(x[i], axis=1)):
         ax.add_artist(
-            Ellipse((x[i][2, j], x[i][3, j]), 2 * x[i][0, j], 2 * x[i][1, j], 180 / np.pi * x[i][4, j], fc="none",
+            Ellipse((x[i][2, j], x[i][3, j]), 2 * x[i][0, j] + x[i][1, j], 
+                    2 * x[i][0, j], 180 / np.pi * x[i][4, j], fc="none",
                     ec="blue"))
     return ax
 
@@ -125,27 +129,29 @@ def Rotate(x, y, phi):
 
 def mindist(x, i, j):
     
-    p = x[2:4, i] + np.array(Rotate(x[0, i]/2, 0, x[4, i]))
-    p = np.vstack((p, x[2:4, j] + np.array(Rotate(x[0, j]/2, 0, 
-                                                     x[4, j]))))
-    q = x[2:4, i] - np.array(Rotate(x[0, i]/2, 0, x[4, i]))
-    q = np.vstack((q, x[2:4, j] - np.array(Rotate(x[0, j]/2, 0, 
-                                                     x[4, j]))))  
+    p1 = x[2:4, i] + np.array(Rotate(x[1, i]/2, 0, x[4, i]))
+    p2 = x[2:4, j] + np.array(Rotate(x[1, j]/2, 0, x[4, j]))
+    p = np.vstack((p1, p2))
+    
+    q1 = x[2:4, i] - np.array(Rotate(x[1, i]/2, 0, x[4, i]))
+    q2 = x[2:4, j] - np.array(Rotate(x[1, j]/2, 0, x[4, j]))
+    q = np.vstack((q1, q2))  
     u = q - p
     
-    p = np.vstack((p[0,:] - p[1,:], p))
+    p = np.vstack((p1 - p2, p))
     
     def f(t):
         return np.dot(t[0]*u[0,:] - t[1]*u[1,:] + p[0,:], 
                       t[0]*u[0,:] - t[1]*u[1,:] + p[0,:])
     
-    cross = np.cross(u[:,0], u[:,1])
-    C = np.linalg.norm(cross)
+    C = np.mod(np.abs(x[4, i] - x[4, j]), np.pi)
     
     if C>1e-5:
         
-        s0 = np.dot(np.cross(p[0,:], u[1,:]), cross) / C ** 2
-        t0 = np.dot(np.cross(p[0,:], u[0,:]), cross) / C ** 2
+        cross = np.cross(u[0,:], u[1,:])
+        normC = np.linalg.norm(cross)
+        s0 = np.dot(np.cross(p[0,:], u[1,:]), cross) / normC ** 2
+        t0 = np.dot(np.cross(p[0,:], u[0,:]), cross) / normC ** 2
         
         if (0 <= s0 <= 1) and (0 <= t0 <= 1):
             
@@ -173,22 +179,31 @@ def mindist(x, i, j):
             mini[3,:2] = [np.dot((u[1,:] - p[0,:]), u[0,:])/
                           np.linalg.norm(u[0,:])**2, 1]
 
-            if not 0 <= mini[0,1] <= 1:
+            if 0 <= mini[0,1] <= 1:
+                mini[0, 2] = f((mini[0,0], mini[0,1]))
+            else:
                 mini[0, :] = (0, 0, f((0, 0)))
                 mini = np.vstack((mini, (0, 1, f((0, 1)))))
                 
-            if not 0 <= mini[1,1] <= 1:
+            if 0 <= mini[1,1] <= 1:
+                mini[1, 2] = f((mini[1,0], mini[1,1]))
+            else:
                 mini[1, :] = (1, 0, f((1, 0)))
                 mini = np.vstack((mini, (1, 1, f((1, 1)))))
                 
-            if not 0 <= mini[2,0] <= 1:
+            if 0 <= mini[2,0] <= 1:
+                mini[2, 2] = f((mini[2,0], mini[2,1]))
+            else:
                 mini[2, :] = (0, 0, f((0, 0)))
                 mini = np.vstack((mini, (1, 0, f((1, 0)))))
                 
-            if not 0 <= mini[3,0] <= 1:
+            if 0 <= mini[3,0] <= 1:
+                mini[3, 2] = f((mini[3,0], mini[3,1]))
+            else:
                 mini[3, :] = (0, 1, f((0, 1)))
                 mini = np.vstack((mini, (1, 1, f((1, 1)))))
-                           
+                
+                       
                 
             d2 = np.min(mini, axis=0)[2]
             
@@ -303,7 +318,7 @@ def Intersections(x, length, radius, L):
             if i != j:
                 intersectingCells[i].append(j)
                 d[i, j], a[i, j] = mindist(x, i, j)
-                d[j, i], a[j, i] = d[i, j], a[i, j]
+                d[j, i], a[j, i] = d[i, j], np.roll(a[i, j], 1, axis=0)
             else:
                 continue
 
@@ -315,7 +330,7 @@ def Intersections(x, length, radius, L):
                 else:
                     intersectingCells[i].append(j)
                     d[i, j], a[i, j] = mindist(x, i, j)
-                    d[j, i], a[j, i] = d[i, j], a[i, j]
+                    d[j, i], a[j, i] = d[i, j], np.roll(a[i, j], 1, axis=0)
 
 
     return intersectingCells, d, a

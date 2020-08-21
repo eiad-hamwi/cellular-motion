@@ -1,8 +1,6 @@
 import numpy as np
-from numpy import random
-import matplotlib.pyplot as plt
-
 import fresh_attempt
+from numpy import random
 
 
 def GenerateCells(N, radius, length, L, resolution=5):
@@ -19,7 +17,7 @@ def GenerateCells(N, radius, length, L, resolution=5):
                        1, 
                        40 * random.rand()
                        ))
-    
+    """
     for i in range(1,N):
         Cells = np.hstack((Cells, 
                            np.vstack((radius, 
@@ -30,25 +28,30 @@ def GenerateCells(N, radius, length, L, resolution=5):
                                       40 * random.rand()
                                       ))
                            ))
-
-    n = 1
     """
+    n = 1
+ 
     while n < N:
     
 
-        testCell = np.vstack(
-            (majorAxis, minorAxis, L * random.rand(), L * random.rand(), pi * (random.rand() - 1 / 2), 1, 40 * random.rand()))
-        if mindist(testCell, Cells) < minorAxis:
-            continue
+        testCell = np.vstack((radius, 
+                       length, 
+                       L * random.rand(), L * random.rand(), 
+                       pi * (random.rand() - 1 / 2), 0, 0, 0, 
+                       1, 
+                       40 * random.rand()
+                       ))
 
         # Intersections func 
         Cprime = np.hstack((Cells, testCell))
 
         S = []
-        intersectingCells = fresh_attempt.Intersections(Cprime, majorAxis, minorAxis, L)
+        intersectingCells, d, a = fresh_attempt.Intersections(
+            Cprime, length, radius, L)
+
+
         for j in intersectingCells[n]:
-            k = np.size(fresh_attempt.InterPoints(testCell[:, 0], Cells[:, j]))
-            if k > 4:
+            if d[n, j] < radius / 2:
                 S.append(j)
 
         if np.size(S) > 0:
@@ -58,20 +61,18 @@ def GenerateCells(N, radius, length, L, resolution=5):
             possibleOrientations = np.zeros(resolution)
 
             while i < resolution:
-                S = []
-                intersectingCells = fresh_attempt.Intersections(Cprime, majorAxis, minorAxis, L)
-                for j in intersectingCells[n]:
-                    k = np.size(fresh_attempt.InterPoints(testCell[:, 0], Cells[:, j]))
-                    if k > 4:
-                        S.append(j)
+                
+                intersectingCells, d, a = fresh_attempt.Intersections(
+                    Cprime, length, radius, L)
+                
 
-                possibleOrientations[i] = np.size(S)
+                possibleOrientations[i] = min(d[n, :])
                 testCell[4] = phi + i * pi / resolution
                 Cprime = np.hstack((Cells, testCell))
                 i += 1
 
-            if min(possibleOrientations) == 0:
-                i = random.choice(np.where(possibleOrientations == 0)[0])
+            if max(possibleOrientations) > radius / 2:
+                i = random.choice(np.where(possibleOrientations > radius/2)[0])
                 testCell[4] = phi + i * pi / resolution
                 Cells = np.hstack((Cells, testCell))
                 n += 1
@@ -81,7 +82,7 @@ def GenerateCells(N, radius, length, L, resolution=5):
         else:
             Cells = np.hstack((Cells, testCell))
             n += 1
-    """
+
 
     x = [Cells]
 
@@ -102,8 +103,8 @@ def GenerateCellsNonRandom(majorAxis, minorAxis, L, resolution=5):
     return x
 
 
-def dynamic_update_step(x, attachments, dt, radius, length, L, rep=True, tau=10, elongationRate=0.02, sigma=1,
-                        mu=0.5):
+def dynamic_update_step(x, attachments, dt, radius, length, L, rep=True, 
+                        tau=10, elongationRate=0.02, kcc=1, gamma=0):
     eps = 3e-5
     t = len(x) - 1
     N0 = np.size(x[t], axis=1)
@@ -114,7 +115,6 @@ def dynamic_update_step(x, attachments, dt, radius, length, L, rep=True, tau=10,
     # loop over cells adult cells
     for i in range(N0):
 
-#        print(S) # print S to figure out what's going on
 #        x[t + 1][6, i] -= dt
 
         for j in S[i]:
@@ -128,10 +128,10 @@ def dynamic_update_step(x, attachments, dt, radius, length, L, rep=True, tau=10,
             dcc = r1 + r2 - d[i, j]
             rprime1 = np.hstack((rcc - np.array([x1, y1]), 0))
             rprime2 = np.hstack((rcc - np.array([x2, y2]), 0))
-            vcc = x[5:7, i] - x[5:7, j] + np.cross(np.array([0, 0, omega1]), 
-                                                  rprime1)[:2] - np.cross(
-                                                      np.array([0, 0, omega2]),
-                                                      rprime2)[:2]
+            vcc = x[t][5:7, i] - x[t][5:7, j] + np.cross(
+                np.array([0, 0, omega1]), rprime1)[:2] - np.cross(
+                    np.array([0, 0, omega2]), rprime2)[:2]
+                    
             tanComp = np.linalg.norm(vcc - np.dot(vcc, ncc) * ncc)
             if tanComp < 1e-5:
                 tcc = np.roll(ncc, 1)
@@ -139,40 +139,46 @@ def dynamic_update_step(x, attachments, dt, radius, length, L, rep=True, tau=10,
             else:
                 tcc = (vcc - np.dot(vcc, ncc) * ncc) / tanComp
                 
-            Vi = np.pi * r1 ** 2 + 2 * r1 * l1
-            Vj = np.pi * r2 ** 2 + 2 * r2 * l2
-            M = Vi * Vj / (Vi + Vj)
+            VolI = np.pi * r1 ** 2 + 2 * r1 * l1
+            VolJ = np.pi * r2 ** 2 + 2 * r2 * l2
+            M = VolI * VolJ / (VolI + VolJ)
+            
+            force = (4/3 * kcc / np.sqrt(1/r1 + 1/r2) * np.sqrt(dcc) - 
+                     gamma * M * np.dot(vcc, ncc)) * dcc * ncc
+            
+            torque = np.cross(rprime1, force)
+            
+            I = ((3*r1**2 + l1**2)/12 * l1*r1**2 + 
+                 (2/5*r1**2 + l1**2/4) * 4/3*r1**2 )/(l1*r1**2 + 4/3*r1**2)*M
     
 
             
 
-            x[t + 1][2, i] += mu * (vx1 + forceX * dt / 2) * dt
-            x[t + 1][3, i] += mu * (vx2 + forceY * dt / 2) * dt
-            x[t + 1][4, i] += 4 * mu * torque * dt / 
+            x[t + 1][[2, 3], i] += force * dt / M
+            x[t + 1][4, i] += torque[2] * dt / I
 
-            x[t + 1][5, j] -= mu * forceX * dt / A2 / B2
-            x[t + 1][6, j] -= mu * forceY * dt / A2 / B2
-            x[t + 1][7, j] -= 4 * mu * torque * dt / (A2 ** 2 + B2 ** 2)
 
+    return x
+"""
             # print variables to figure out what's going on
-#            print('Time ')
-#            print(t)
-#            print(i)
-#            print(forceX)
-#            print(forceY)
+            print('Time ')
+            print(t)
+            print(i)
+            print(forceX)
+            print(forceY)
 
-#        if x[t + 1][5, i] > 0:
+        if x[t + 1][5, i] > 0:
 
-#            x[t + 1][6, i] -= dt
+            x[t + 1][6, i] -= dt
 
         # growing the daughter cells in the G2 growth phase
         # (elongationRate) variable depends on the local concentration of nutrients
         if x[t + 1][5, i] == 0:
 
-            if x[t + 1][0, i] < majorAxis:
+            if x[t + 1][0, i] < radius:
 
                 x[t + 1][0, i] += elongationRate * dt
-                x[t + 1][1, i] += minorAxis / majorAxis * elongationRate * dt
+                x[t + 1][1, i] += length / radius * elongationRate * dt
 
             # daughter cell finishes growing, detaches and becomes adult cell
             else:
@@ -184,8 +190,7 @@ def dynamic_update_step(x, attachments, dt, radius, length, L, rep=True, tau=10,
     if rep:
         attachments = [[] for i in range(N0)]
         x, attachments = fresh_attempt.Reproduce(x, attachments, tau, dt)
-
-    return x
+"""
 
 
 def add_ellipse(x, majorAxis, minorAxis, X, Y, theta):
