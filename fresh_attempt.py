@@ -72,7 +72,7 @@ def ells(x, i, ax):
 
 
 #   this generates all the image files, writes the GIF animation, then deletes the image file
-def animate(x, size, filename):
+def animate(x, size, filename, frames):
     image_list = []
     for i in range(len(x)):
         fig, canvas, ax = anim_init(size)                       # initialize Figure
@@ -80,7 +80,10 @@ def animate(x, size, filename):
         fig.savefig('plots/test.png')                           # save plot to temporary image file
         image_list.append(imageio.imread('plots/test.png'))     # transform image file into NumPy array
     os.remove('plots/test.png')                                 # delete the image file
-    imageio.mimwrite('plots/{}.gif'.format(str(filename)), image_list)             # compile image_list into GIF
+    imageio.mimwrite('plots/{}.gif'.format(str(filename)), 
+                     [image_list[i] for i in 
+                      range(0, len(image_list), 
+                            len(image_list)//frames)])           # compile image_list into GIF
 
 
 def PlotTemporalCells(y, size):  # ellipse plotting module for cells (not final)
@@ -243,7 +246,7 @@ def mindist(x, i, j):
         
         a = np.vstack((p[1, :], q[0, :]))[index, :]
         
-        a = np.vstack((a, p[2, :] + t[index]*u[1, :]))
+        a = np.vstack((a, p[2, :] + t[index] * u[1, :]))
         
     return d, a
                 
@@ -289,10 +292,6 @@ def Intersections(x, length, radius, L):
     # initialize intersection index array
     n = np.size(x, axis=1)
     intersectingCells = [[] for k in range(n)]
-    
-    # initialize intersection data array
-    d = np.full((n,n), np.nan)
-    a = np.full((n,n,2,2), np.nan)
 
     # set up coarse-grained background lattice (as a flattened array)
     BG = BackgroundLattice(x, L, radius)
@@ -316,9 +315,11 @@ def Intersections(x, length, radius, L):
 
         for j in BG[Xi + r][Yi + r]:
             if i != j:
-                intersectingCells[i].append(j)
-                d[i, j], a[i, j] = mindist(x, i, j)
-                d[j, i], a[j, i] = d[i, j], np.roll(a[i, j], 1, axis=0)
+                
+                d, a = mindist(x, i, j)
+                
+                intersectingCells[i].append([[j, a[0, :]], [d, a[1, :]]])
+                
             else:
                 continue
 
@@ -328,62 +329,10 @@ def Intersections(x, length, radius, L):
                 if mindist(x, i, j)[0] >= x[0, i] + x[0, j]:
                     continue
                 else:
-                    intersectingCells[i].append(j)
-                    d[i, j], a[i, j] = mindist(x, i, j)
-                    d[j, i], a[j, i] = d[i, j], np.roll(a[i, j], 1, axis=0)
+                    
+                    d, a = mindist(x, i, j)
+                
+                    intersectingCells[i].append([[j, a[0, :]], [d, a[1, :]]])
 
 
-    return intersectingCells, d, a
-
-
-def Reproduce(x, attachments, tau, dt=1):
-    #   Creates new cells to add to the list of existing cells occupying space
-    #   tau is reproduction half-life per individual
-    #   this step does NOT update the time i.e. cells do not move in this update step
-
-    t = len(x) - 1
-    N = np.size(x[t], axis=1)
-    dn = np.random.poisson(N * dt / tau)
-    reproducingCells = np.random.choice(np.arange(N), dn, replace=False)
-    phis = np.random.normal(0, np.pi / 6, dn)
-
-    attachments.extend([[] for i in range(dn)])
-
-    for i in range(dn):
-
-        attachments[reproducingCells[i]].append(N - 1 + i)
-        attachments[N - 1 + i].append(reproducingCells[i])
-
-        # k gives a uniform chance of budding on either side of the mother cell
-        k = random.uniform()
-        if k < 0.5:
-
-            xmid, ymid = Rotate(x[t][0, reproducingCells[i]] * np.cos(phis[i]),
-                                x[t][1, reproducingCells[i]] * np.sin(phis[i]), x[t][4, reproducingCells[i]])
-            xmid += x[t][2, reproducingCells[i]]
-            ymid += x[t][3, reproducingCells[i]]
-
-            theta = x[t][4, reproducingCells[i]] + np.arctan(
-                x[t][0, reproducingCells[i]] / x[t][1, reproducingCells[i]] * np.tan(phis[i]))
-
-            a0 = x[t][0, reproducingCells[i]] / 5
-            b0 = x[t][1, reproducingCells[i]] / 5
-            xcen = xmid + a0 * np.cos(theta)
-            ycen = ymid + b0 * np.sin(theta)
-
-        else:
-            xmid, ymid = Rotate(-x[t][0, reproducingCells[i]] * np.cos(phis[i]),
-                                -x[t][1, reproducingCells[i]] * np.sin(phis[i]), x[t][4, reproducingCells[i]])
-            xmid += x[t][2, reproducingCells[i]]
-            ymid += x[t][3, reproducingCells[i]]
-            theta = x[t][4, reproducingCells[i]] + np.arctan(
-                x[t][0, reproducingCells[i]] / x[t][1, reproducingCells[i]] * np.tan(phis[i]))
-            a0 = x[t][0, reproducingCells[i]] / 5
-            b0 = x[t][1, reproducingCells[i]] / 5
-            xcen = xmid - a0 * np.cos(theta)
-            ycen = ymid - b0 * np.sin(theta)
-
-        x[t] = np.hstack((x[t], [[a0], [b0], [xcen], [ycen], [theta], [0], [0]]))
-        x[t][5, reproducingCells[i]] += 1
-
-    return x, attachments
+    return intersectingCells
