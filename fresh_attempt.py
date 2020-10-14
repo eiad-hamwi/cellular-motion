@@ -1,5 +1,5 @@
 import os
-import imageio
+# import imageio
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy import random
@@ -72,18 +72,18 @@ def ells(x, i, ax):
 
 
 #   this generates all the image files, writes the GIF animation, then deletes the image file
-def animate(x, size, filename, frames):
-    image_list = []
-    for i in range(len(x)):
-        fig, canvas, ax = anim_init(size)                       # initialize Figure
-        ax = ells(x, i, ax)                                     # add ellipses
-        fig.savefig('plots/test.png')                           # save plot to temporary image file
-        image_list.append(imageio.imread('plots/test.png'))     # transform image file into NumPy array
-    os.remove('plots/test.png')                                 # delete the image file
-    imageio.mimwrite('plots/{}.gif'.format(str(filename)), 
-                     [image_list[i] for i in 
-                      range(0, len(image_list), 
-                            len(image_list)//frames)])           # compile image_list into GIF
+# def animate(x, size, filename, frames):
+#     image_list = []
+#     for i in range(len(x)):
+#         fig, canvas, ax = anim_init(size)                       # initialize Figure
+#         ax = ells(x, i, ax)                                     # add ellipses
+#         fig.savefig('plots/test.png')                           # save plot to temporary image file
+#         image_list.append(imageio.imread('plots/test.png'))     # transform image file into NumPy array
+#     os.remove('plots/test.png')                                 # delete the image file
+#     imageio.mimwrite('plots/{}.gif'.format(str(filename)),
+#                      [image_list[i] for i in
+#                       range(0, len(image_list),
+#                             len(image_list)//frames)])           # compile image_list into GIF
 
 
 def PlotTemporalCells(y, size):  # ellipse plotting module for cells (not final)

@@ -9,6 +9,7 @@ def GenerateCells(N, radius, length, L, resolution=5):
     #   2D linear and angular velocities (vx, vy, omega), 
     #   Reproduction Number, and time-to-budding] for each of the N cells
     pi = np.pi
+    random.seed(2)
 
     Cells = np.vstack((radius, 
                        length, 
