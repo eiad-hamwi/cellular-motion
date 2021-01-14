@@ -15,7 +15,7 @@ def GenerateCells(N, radius, length, L, resolution=5):
                        L * random.rand(), L * random.rand(), 
                        pi * (random.rand() - 1 / 2), 0, 0, 0, 
                        1, 
-                       40 * random.rand()
+                       max(0,random.normal(40, 5))
                        ))
     """
     for i in range(1,N):
@@ -39,7 +39,7 @@ def GenerateCells(N, radius, length, L, resolution=5):
                        L * random.rand(), L * random.rand(), 
                        pi * (random.rand() - 1 / 2), 0, 0, 0, 
                        1, 
-                       40 * random.rand()
+                       max(0,random.normal(40, 5))
                        ))
 
         # Intersections func 
@@ -92,14 +92,21 @@ def GenerateCells(N, radius, length, L, resolution=5):
     return x
 
 
-def GenerateCellsNonRandom(majorAxis, minorAxis, L, resolution=5):
+def GenerateCellsNonRandom(radius, length, L):
     #   Generates a (7 x N) array of cell configurations [majorAxis, minorAxis, 2D-positions (x, y), orientations (phi)
     #   in [-Pi,Pi), Reproduction Number, and time-to-budding] of all the N cells
     pi = np.pi
 
-    Cells = np.vstack((majorAxis, minorAxis, L*0.5, L*0.5, pi , 1, 40*random.rand()))
+    Cells = np.vstack((radius, length, L/2, L/2-0.001, 0, 
+                       0, 0, 0, 
+                       1, 40*random.rand()
+                       ))
 
-    Cells = np.hstack((Cells, np.vstack((majorAxis, minorAxis, 0.5*L + 5/3*majorAxis, L*0.5, pi , 1, 40*random.rand()))))
+    Cells = np.hstack((Cells, 
+                       np.vstack((radius, length, L/2, L/2 + length/2, np.pi/2, 
+                                  0, 0, 0, 
+                                  1, 40*random.rand()))
+                       ))
 
     x = [Cells]
 
@@ -165,7 +172,7 @@ def dynamic_update_step(x, attachments, dt, radius, length, L, rep=False,
                     
             else:
                 x[t + 1][8, i] += 1
-                x[t + 1][9, i] = 40
+                x[t + 1][9, i] = max(0,random.normal(40, 5))
 
                 if rep:
                     
@@ -213,7 +220,7 @@ def dynamic_update_step(x, attachments, dt, radius, length, L, rep=False,
 # daughter cell finishes growing, detaches and becomes adult cell
             else:
                 x[t + 1][8, i] = 1
-                x[t + 1][9, i] = 40
+                x[t + 1][9, i] = max(0,random.normal(40, 5))
                 attachments[attachments[i][0]].remove(i)
                 attachments[i].remove(attachments[i][0])
                 
