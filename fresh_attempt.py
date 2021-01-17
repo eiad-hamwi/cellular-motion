@@ -54,23 +54,10 @@ def PlotFewCells(x, t, J):  # ellipse plotting module for cells (not final)
     ax.set_ylim(min(Y) - 2 * A, max(Y) + 2 * A)
 
     for j in J:
-        width = 2 * x[t][0, j] + x[t][1, j]
-        length = 2 * x[t][0, j]
-        c = np.cos(x[t][4, j])
-        s = np.sin(x[t][4, j])
-
-        # rotate corner of rectangle
-        rx, ry = np.dot([[c, -s],
-                         [s, c]],
-                        [-width / 2, -length / 2])
-
-        # shift corner to cell location
-        rx, ry = rx + x[t][2, j], ry + x[t][3, j]
-
         ax.add_artist(
-            Rectangle((rx, ry), width, length, 180 / np.pi * x[t][4, j],
-                      fc="none", ec="blue")
-        )
+            Ellipse((x[t][2, j], x[t][3, j]), 2 * x[t][0, j] + x[t][1, j],
+                    2 * x[t][0, j], 180 / np.pi * x[t][4, j], fc="none",
+                    ec="blue"))
 
     return plt.show()
 
@@ -126,7 +113,7 @@ def animate(x, size, filename, frames):
     for i in range(0, len(x), len(x) // frames):
         fig, canvas, ax = anim_init(size)  # initialize Figure
         ax = rect(x, i, ax)  # add ellipses
-        fig.savefig('plots/test.png')  # save plot to temporary image file
+        fig.savefig('plots/test.png', dpi=300)  # save plot to temporary image file
         image_list.append(imageio.imread('plots/test.png'))  # transform image file into NumPy array
     os.remove('plots/test.png')  # delete the image file
     imageio.mimwrite('plots/{}.gif'.format(str(filename)),
@@ -177,6 +164,91 @@ def Rotate(x, y, phi):
     return xR, yR
 
 
+def mindist(x, i, j):
+    p1 = x[2:4, i] + np.array(Rotate(x[1, i] / 2, 0, x[4, i]))
+    p2 = x[2:4, j] + np.array(Rotate(x[1, j] / 2, 0, x[4, j]))
+
+    q1 = x[2:4, i] - np.array(Rotate(x[1, i] / 2, 0, x[4, i]))
+    q2 = x[2:4, j] - np.array(Rotate(x[1, j] / 2, 0, x[4, j]))
+    
+    eps = 1e-4
+
+    d1 = q1 - p1
+    d2 = q2 - p2
+    d12 = p2 - p1
+
+    D1 = np.dot(d1, d1)
+    D2 = np.dot(d2, d2)
+    R = np.dot(d1, d2)
+    denom = D1*D2 - R**2
+
+    if (D1<eps) != (D2<eps):
+        S1 = np.dot(d1, d12)
+        u = 0
+        t = S1/D1
+
+        if t<0:
+            t = 0
+        elif t>1:
+            t = 1
+
+        return np.sqrt(np.dot(t*d1 - d12, t*d1 - d12)), \
+               np.vstack(((1-t)*p1 + t*q1, (1-u)*p2 + u*q2))
+
+    elif (D1<eps) and (D2<eps):
+        u = 0
+        t = 0
+
+        return np.sqrt(np.dot(d12, d12)), \
+               np.vstack(((1-t)*p1 + t*q1, (1-u)*p2 + u*q2))
+
+
+    elif abs(denom)<eps**2:
+        S2 = np.dot(d2, d12)
+        u = -S2/D2
+        t = 0
+
+        if u<0:
+            u = 0
+        elif u>1:
+            u = 1
+
+        return np.sqrt(np.dot(u*d2 + d12, u*d2 + d12)), \
+               np.vstack(((1-t)*p1 + t*q1, (1-u)*p2 + u*q2))
+
+    else:
+        S1 = np.dot(d1, d12)
+        S2 = np.dot(d2, d12)
+        t = (S1*D2 - S2*R)/denom
+
+        if t<0:
+            t = 0
+        elif t>1:
+            t = 1
+
+        u = (t*R - S2)/D2
+
+        if u<0:
+            u = 0
+            t = S1/D1
+            if t<0:
+                t = 0
+            elif t>1:
+                t = 1
+
+        elif u>1:
+            u = 1
+            t = (R + S1)/D1
+            if t<0:
+                t = 0
+            elif t>1:
+                t = 1    
+
+        return np.sqrt(np.dot(t*d1 - u*d2 - d12, t*d1 - u*d2 - d12)), \
+               np.vstack(((1-t)*p1 + t*q1, (1-u)*p2 + u*q2))
+
+
+"""
 def mindist(x, i, j):
     p1 = x[2:4, i] + np.array(Rotate(x[1, i] / 2, 0, x[4, i]))
     p2 = x[2:4, j] + np.array(Rotate(x[1, j] / 2, 0, x[4, j]))
@@ -290,6 +362,7 @@ def mindist(x, i, j):
         a = np.vstack((a, p[2, :] + t[index] * u[1, :]))
 
     return d, a
+"""
 
 
 def BackgroundLattice(x, L, radius):

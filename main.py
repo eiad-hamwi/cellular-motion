@@ -116,7 +116,7 @@ def GenerateCellsNonRandom(radius, length, L):
 
 def dynamic_update_step(x, attachments, dt, radius, length, L, rep=False, 
                         tau=10, elongationRate=0.02, kcc=1, gamma=0):
-    eps = 3e-5
+    eps = 1e-5
     t = len(x) - 1
     N0 = np.size(x[t], axis=1)
 
@@ -134,8 +134,22 @@ def dynamic_update_step(x, attachments, dt, radius, length, L, rep=False,
             for j in range(len(S[i])):  
                 r1, l1, x1, y1, theta1, vx1, vy1, omega1 = x[t][:8, i]
                 r2, l2, x2, y2, theta2, vx2, vy2, omega2 = x[t][:8, S[i][j][0][0]]
-                
-                ncc = (S[i][j][0][1] - S[i][j][1][1]) / S[i][j][1][0]
+                VolI = np.pi * r1 ** 2 + 2 * r1 * l1
+                VolJ = np.pi * r2 ** 2 + 2 * r2 * l2
+                M = VolI * VolJ / (VolI + VolJ)
+
+                if S[i][j][1][0] > 0:
+                    ncc = (S[i][j][0][1] - S[i][j][1][1]) / S[i][j][1][0]
+                else:
+                    ncc1 = np.array([x2, y2]) + np.array([l2*np.cos(theta2), l2*np.sin(theta2)]) - S[i][j][0][1]
+                    ncc2 = np.array([x2, y2]) - np.array([l2*np.cos(theta2), l2*np.sin(theta2)]) - S[i][j][0][1]
+                    dn1 = np.dot(ncc1, ncc1)
+                    dn2 = np.dot(ncc2, ncc2)
+                    if dn1 < dn2:
+                        ncc = ncc1 / np.sqrt(dn1)
+                    else:
+                        ncc = ncc2 / np.sqrt(dn2)
+
                 rcc = (S[i][j][0][1] + S[i][j][1][1]) / 2
                 dcc = r1 + r2 - S[i][j][1][0]
                 if dcc < 0:
@@ -145,27 +159,25 @@ def dynamic_update_step(x, attachments, dt, radius, length, L, rep=False,
                 vcc = x[t][5:7, i] - x[t][5:7, S[i][j][0][0]] + np.cross(
                     np.array([0, 0, omega1]), rprime1)[:2] - np.cross(
                         np.array([0, 0, omega2]), rprime2)[:2]
-                        
-                tanComp = np.linalg.norm(vcc - np.dot(vcc, ncc) * ncc)
-                if tanComp < 1e-5:
+
+                tanComp = np.sqrt(np.dot(vcc - np.dot(vcc, ncc) * ncc, vcc - np.dot(vcc, ncc) * ncc))
+                if tanComp < eps:
                     tcc = np.roll(ncc, 1)
                     tcc[0] *= -1
                 else:
                     tcc = (vcc - np.dot(vcc, ncc) * ncc) / tanComp
-                
-                VolI = np.pi * r1 ** 2 + 2 * r1 * l1
-                VolJ = np.pi * r2 ** 2 + 2 * r2 * l2
-                M = VolI * VolJ / (VolI + VolJ)
-                
-                force = (4/3 * kcc / np.sqrt(1/r1 + 1/r2) * np.sqrt(dcc) - 
+
+
+                force = (4/3 * kcc / np.sqrt(1/r1 + 1/r2) * np.sqrt(dcc) -
                          gamma * M * np.dot(vcc, ncc)) * dcc * ncc
                 torque = np.cross(rprime1, force)
-                I = ((3*r1**2 + l1**2)/12 * l1*r1**2 + 
+                I = ((3*r1**2 + l1**2)/12 * l1*r1**2 +
                      (2/5*r1**2 + l1**2/4) * 4/3*r1**2 )/(l1*r1**2 + 4/3*r1**2)*VolI
 
 
                 x[t + 1][[2, 3], i] += force * dt / VolI
                 x[t + 1][4, i] += torque[2] * dt / I
+
 
   
             if x[t + 1][9, i] > dt:
@@ -173,7 +185,7 @@ def dynamic_update_step(x, attachments, dt, radius, length, L, rep=False,
                     
             else:
                 x[t + 1][8, i] += 1
-                x[t + 1][9, i] = max(0,random.normal(40, 5))
+                x[t + 1][9, i] = max(0, random.normal(40, 5))
 
                 if rep:
                     
