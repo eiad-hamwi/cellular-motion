@@ -14,8 +14,8 @@ def PlotCells(x, i, size):  # ellipse plotting module for cells (not final)
     fig = plt.figure(0)
     ax = fig.add_subplot(111, aspect='equal')
 
-    ax.set_xlim(0, size)
-    ax.set_ylim(0, size)
+    ax.set_xlim(-size, size)
+    ax.set_ylim(-size, size)
 
     for j in range(np.size(x[i], axis=1)):
         width = 2 * x[i][0, j] + x[i][1, j]
@@ -67,8 +67,8 @@ def anim_init(size):
     fig = Figure()
     canvas = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    ax.set_xlim(0, size)
-    ax.set_ylim(0, size)
+    ax.set_xlim(-size, size)
+    ax.set_ylim(-size, size)
     ax.set_aspect(1)
 
     return fig, canvas, ax
@@ -171,7 +171,7 @@ def mindist(x, i, j):
     q1 = x[2:4, i] - np.array(Rotate(x[1, i] / 2, 0, x[4, i]))
     q2 = x[2:4, j] - np.array(Rotate(x[1, j] / 2, 0, x[4, j]))
     
-    eps = 1e-4
+    eps = 1e-3
 
     d1 = q1 - p1
     d2 = q2 - p2
@@ -249,7 +249,7 @@ def mindist(x, i, j):
 
 
 """
-def mindist(x, i, j):
+def mindist_old(x, i, j):
     p1 = x[2:4, i] + np.array(Rotate(x[1, i] / 2, 0, x[4, i]))
     p2 = x[2:4, j] + np.array(Rotate(x[1, j] / 2, 0, x[4, j]))
     p = np.vstack((p1, p2))
@@ -372,13 +372,13 @@ def BackgroundLattice(x, L, radius):
     # L is width of simulation square
     # radius is short axis of ellipse
 
-    a = radius / L
-    N = np.int(np.ceil(1 / a))
+    a = radius / (2*L)
+    N = int(np.ceil(1 / a))
     BG = [[[] for i in range(N)] for j in range(N)]
 
     for k in range(np.size(x, axis=1)):
-        Xk = int(np.floor(x[2, k] / radius))
-        Yk = int(np.floor(x[3, k] / radius))
+        Xk = int((x[2, k] + L) / radius)
+        Yk = int((x[3, k] + L) / radius)
 
         BG[Xk][Yk].append(k)
 
@@ -422,8 +422,7 @@ def Intersections(x, length, radius, L):
                 continue
 
     for i in range(np.size(x, axis=1)):
-        Xi, Yi = int(np.floor(x[2, i] / radius)), int(np.floor(x[3, i] /
-                                                               radius))
+        Xi, Yi = int((x[2, i] + L) / radius), int((x[3, i] + L) / radius)
 
         for j in BG[Xi + r][Yi + r]:
             if i != j:
